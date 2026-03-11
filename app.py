@@ -59,7 +59,6 @@ STOPWORDS = {
     "the","a","an","and","or","in","on","with","without","to","of","for","by","from"
 }
 
-# priorité d’affichage des types
 TYPE_PRIORITY = {
     "subscription": 0,
     "free": 1,
@@ -144,7 +143,6 @@ def iso2_from_country_text(country_text: str) -> str:
         return first.upper()
     return _COUNTRY_MAP.get(norm_text(first), "")
 
-# drapeau en image (robuste Windows/Chrome)
 def flag_img_html(iso2: str) -> str:
     if not iso2:
         return ""
@@ -187,15 +185,12 @@ def load_profile():
             p = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
             p.setdefault("country", "fr")
             p.setdefault("lang", "fr")
-            p.setdefault("show_type", "movie")
             p.setdefault("platform_ids", [])
             p.setdefault("show_elsewhere", False)
-            if p.get("show_type") not in ("movie", "series"):
-                p["show_type"] = "movie"
             return p
         except Exception:
             pass
-    return {"country":"fr","lang":"fr","show_type":"movie","platform_ids":[],"show_elsewhere":False}
+    return {"country":"fr","lang":"fr","platform_ids":[],"show_elsewhere":False}
 
 def save_profile(p):
     PROFILE_PATH.write_text(json.dumps(p, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -279,7 +274,6 @@ def search_by_keyword(keyword: str, country: str, show_type: str, lang: str):
     })
     return res.get("shows", []) if isinstance(res, dict) else []
 
-# récupérer le “Get Show” pour liens plus complets
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_show_details(show_id: str, country: str, show_type: str, lang: str) -> dict:
     if not show_id:
@@ -294,14 +288,6 @@ def get_show_details(show_id: str, country: str, show_type: str, lang: str) -> d
         return {}
 
 def group_options_by_service(options: list) -> list:
-    """
-    Retourne une liste de services:
-    [
-      {"id": "...", "name": "...", "opts":[{"type":"subscription","link":"..."}, ...]},
-      ...
-    ]
-    triée par nom, et options triées par type priority.
-    """
     groups = {}
     for o in options or []:
         s = o.get("service") or {}
@@ -319,7 +305,6 @@ def group_options_by_service(options: list) -> list:
 
     out = list(groups.values())
     for g in out:
-        # dedupe options
         seen = set()
         ded = []
         for opt in g["opts"]:
@@ -335,7 +320,6 @@ def group_options_by_service(options: list) -> list:
     return out
 
 def pick_primary_option(opts: list):
-    """prend subscription si possible, sinon la première selon priorité"""
     if not opts:
         return None, []
     for o in opts:
@@ -444,10 +428,17 @@ def parse_genres(show: dict):
             res.append(a)
     return res
 
-def build_raw_items(query: str, mode: str, prof: dict):
+# --- show_type selection in Recherche ---
+def showtype_to_list(choice: str):
+    if choice == "Film":
+        return ["movie"]
+    if choice == "Série":
+        return ["series"]
+    return ["movie", "series"]
+
+def build_raw_items(query: str, mode: str, prof: dict, show_types: list):
     country = prof["country"]
     lang = prof["lang"]
-    show_type = prof["show_type"]
     allowed = set(prof.get("platform_ids", []))
 
     presets = {
@@ -470,12 +461,12 @@ def build_raw_items(query: str, mode: str, prof: dict):
     queries = q_seen
 
     found = []
-    for kw in queries[:pre["queries_max"]]:
-        found += search_by_keyword(kw, country, show_type, lang)
-
-    if len(found) < pre["en_if_under"]:
+    for stype in show_types:
         for kw in queries[:pre["queries_max"]]:
-            found += search_by_keyword(kw, country, show_type, "en")
+            found += search_by_keyword(kw, country, stype, lang)
+        if len(found) < pre["en_if_under"]:
+            for kw in queries[:pre["queries_max"]]:
+                found += search_by_keyword(kw, country, stype, "en")
 
     shows = merge_results(found)
 
@@ -489,6 +480,7 @@ def build_raw_items(query: str, mode: str, prof: dict):
 
         opts_all = ((sh.get("streamingOptions") or {}).get(country) or [])
         opts_all = dedupe_streaming_options(opts_all)
+
         opts_mine = [o for o in opts_all if ((o.get("service") or {}).get("id") in allowed)]
         opts_mine = dedupe_streaming_options(opts_mine)
 
@@ -524,7 +516,8 @@ def build_raw_items(query: str, mode: str, prof: dict):
     raw.sort(key=lambda x: x["rel"], reverse=True)
     return raw[:pre["pool"]]
 
-def apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, year_min, year_max, genre_filter):
+# ✅ MODIF: filtre année en slider (year_range) au lieu de min/max 0/0
+def apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, year_range, genre_filter):
     items = list(raw_items)
 
     if only_my_apps:
@@ -542,10 +535,10 @@ def apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, 
         k = [x for x in items if okp(x)]
         items = k if k else items
 
-    if year_min:
-        items = [x for x in items if x["year"] is None or x["year"] >= year_min]
-    if year_max:
-        items = [x for x in items if x["year"] is None or x["year"] <= year_max]
+    # année (slider)
+    if year_range:
+        y0, y1 = year_range
+        items = [x for x in items if x["year"] is None or (x["year"] >= y0 and x["year"] <= y1)]
 
     if genre_filter != "Tous":
         ng = norm_text(genre_filter)
@@ -566,20 +559,18 @@ def apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, 
     return items
 
 # ================== NAV / SESSION ==================
-st.session_state.setdefault("did_enter", False)  # Accueil jusqu'à "Entrer 🍿"
+st.session_state.setdefault("did_enter", False)
 st.session_state.setdefault("page", "Accueil" if not st.session_state["did_enter"] else "Recherche")
 st.session_state.setdefault("raw_items", [])
 st.session_state.setdefault("raw_query", "")
-st.session_state.setdefault("actor_search", "")
 
-# acteur via URL
+# acteur via URL (inchangé)
 qp = get_query_params()
 actor_param = None
 if "actor" in qp:
     v = qp.get("actor")
     actor_param = v[0] if isinstance(v, list) and v else (v if isinstance(v, str) else None)
 if actor_param:
-    st.session_state["actor_search"] = actor_param
     clear_query_params()
     st.session_state["did_enter"] = True
     st.session_state["page"] = "Recherche"
@@ -606,13 +597,11 @@ if page == "Accueil":
         st.stop()
 
     with st.form("welcome_profile"):
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns(2)
         with c1:
             country = st.selectbox("Pays", ["fr","be","ch","gb","us"], index=["fr","be","ch","gb","us"].index(profile.get("country","fr")))
         with c2:
             lang = st.selectbox("Langue", ["fr","en"], index=["fr","en"].index(profile.get("lang","fr")))
-        with c3:
-            typ = st.selectbox("Type", ["Film","Série"], index=0 if profile.get("show_type","movie")=="movie" else 1)
 
         services = get_services(country, lang)
         name_to_id = {(s.get("name") or s.get("id")): s.get("id") for s in services if (s.get("name") or s.get("id")) and s.get("id")}
@@ -631,7 +620,6 @@ if page == "Accueil":
             profile = {
                 "country": country,
                 "lang": lang,
-                "show_type": "movie" if typ == "Film" else "series",
                 "platform_ids": platform_ids,
                 "show_elsewhere": False,
             }
@@ -645,16 +633,14 @@ if page == "Accueil":
 # -------- PROFIL --------
 if page == "Profil":
     st.markdown("# Profil")
-    st.caption("Ici tu modifies tes plateformes.")
+    st.caption("Ici tu modifies pays/langue/plateformes. (Film/Série se choisit dans Recherche.)")
 
     with st.form("profile_form"):
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns(2)
         with c1:
             country = st.selectbox("Pays", ["fr","be","ch","gb","us"], index=["fr","be","ch","gb","us"].index(profile.get("country","fr")))
         with c2:
             lang = st.selectbox("Langue", ["fr","en"], index=["fr","en"].index(profile.get("lang","fr")))
-        with c3:
-            typ = st.selectbox("Type", ["Film","Série"], index=0 if profile.get("show_type","movie")=="movie" else 1)
 
         services = get_services(country, lang)
         name_to_id = {(s.get("name") or s.get("id")): s.get("id") for s in services if (s.get("name") or s.get("id")) and s.get("id")}
@@ -673,7 +659,6 @@ if page == "Profil":
             profile = {
                 "country": country,
                 "lang": lang,
-                "show_type": "movie" if typ == "Film" else "series",
                 "platform_ids": platform_ids,
                 "show_elsewhere": bool(profile.get("show_elsewhere", False)),
             }
@@ -697,12 +682,17 @@ if not profile.get("platform_ids"):
     st.session_state["page"] = "Accueil"
     st.rerun()
 
+# ✅ Film/Série ici (pas dans profil)
+show_choice = st.selectbox("Je cherche :", ["Film", "Série", "Les deux"], index=2)
+show_types = showtype_to_list(show_choice)
+
 mode = st.radio("Mode", ["Rapide","Normal","Profond"], horizontal=True, index=1)
 
 def do_search(q: str):
-    raw = build_raw_items(q, mode=mode, prof=profile)
+    raw = build_raw_items(q, mode=mode, prof=profile, show_types=show_types)
     st.session_state["raw_items"] = raw
     st.session_state["raw_query"] = q
+    st.session_state["last_show_types"] = show_types
 
 with st.form("search_form", clear_on_submit=False):
     q_main = st.text_input("Ton souvenir (Entrée lance)", key="q_main")
@@ -716,37 +706,39 @@ if submitted:
         do_search(q)
 
 raw_items = st.session_state.get("raw_items", [])
-
-# genres dispo avant recherche
 genre_choices = ["Tous"] + get_genres(profile["country"], profile["lang"])
 
-# plateformes (issues du profil)
 services = get_services(profile["country"], profile["lang"])
 id_to_name = {s.get("id"): (s.get("name") or s.get("id")) for s in services}
 platform_choices = ["Toutes"] + sorted([id_to_name.get(i, i) for i in profile.get("platform_ids", [])])
 
-# filtres
-c1, c2, c3, c4, c5 = st.columns([2.2, 1.1, 1.6, 1.2, 1.8])
+# filtres (année = slider seulement si résultats)
+c1, c2, c3 = st.columns([2.2, 1.1, 1.6])
 with c1:
     sort_mode = st.selectbox("Trier par", ["Pertinence","Année (récent)","Note (haute)"], index=0)
 with c2:
     only_my_apps = st.checkbox("Mes applis", value=False)
 with c3:
     platform_filter = st.selectbox("Plateforme", platform_choices, index=0)
-with c4:
-    year_min = st.number_input("Min", value=0, min_value=0, max_value=2100, step=1)
-    year_min = None if year_min == 0 else int(year_min)
-with c5:
-    year_max = st.number_input("Max", value=0, min_value=0, max_value=2100, step=1)
-    year_max = None if year_max == 0 else int(year_max)
 
 genre_filter = st.selectbox("Genre", genre_choices, index=0)
 
+year_range = None
+years = sorted({x["year"] for x in raw_items if x.get("year")})
+if years:
+    y_min, y_max = min(years), max(years)
+    if y_min != y_max:
+        year_range = st.slider("Année (min–max)", min_value=int(y_min), max_value=int(y_max), value=(int(y_min), int(y_max)))
+    # si y_min == y_max, pas besoin de slider
+# sinon: pas d’affichage année (ça évite tes 0/0 inutiles)
+
 if raw_items:
     view = apply_filters_and_sort(
-        raw_items, sort_mode=sort_mode, only_my_apps=only_my_apps,
+        raw_items,
+        sort_mode=sort_mode,
+        only_my_apps=only_my_apps,
         platform_filter=platform_filter,
-        year_min=year_min, year_max=year_max,
+        year_range=year_range,
         genre_filter=genre_filter
     )
 
@@ -754,6 +746,20 @@ if raw_items:
     st.write(f"✅ Résultats : {min(len(view), 20)} / {len(view)}")
 
     allowed_ids = set(profile.get("platform_ids", []))
+
+    def details_with_fallback(api_id: str):
+        # pour "Les deux", l'API veut un show_type: on tente dans l'ordre choisi
+        for stype in show_types:
+            d = get_show_details(api_id, profile["country"], stype, profile["lang"])
+            if d:
+                return d
+        # fallback extra si les deux
+        if show_types == ["movie", "series"]:
+            d = get_show_details(api_id, profile["country"], "series", profile["lang"])
+            if d: return d
+            d = get_show_details(api_id, profile["country"], "movie", profile["lang"])
+            if d: return d
+        return {}
 
     for it in view[:20]:
         title = it["title"]
@@ -763,7 +769,6 @@ if raw_items:
         star = stars_html(it["score100"])
         score5 = None if it["score100"] is None else round(float(it["score100"]) / 20.0, 1)
 
-        # drapeau/pays
         country_label = ""
         iso = ""
         if it.get("country_text"):
@@ -792,14 +797,13 @@ if raw_items:
             if line:
                 st.markdown(line, unsafe_allow_html=True)
 
-            # ====== STREAMING: TOUTES plateformes, tes applis d'abord ======
+            # plateformes
             opts_all = it.get("opts_all") or []
             opts_all = dedupe_streaming_options(opts_all)
 
-            # si l'API n'a pas donné tous les liens, on tente /shows/{id} (cache)
             need_details = (not opts_all) or any(((o.get("link") or o.get("videoLink") or "").strip() == "") for o in opts_all)
             if need_details and it.get("api_id"):
-                details = get_show_details(str(it["api_id"]), profile["country"], profile["show_type"], profile["lang"])
+                details = details_with_fallback(str(it["api_id"]))
                 opts_all2 = ((details.get("streamingOptions") or {}).get(profile["country"]) or [])
                 opts_all2 = dedupe_streaming_options(opts_all2)
                 if opts_all2:
@@ -809,13 +813,11 @@ if raw_items:
             mine = [g for g in groups if (g["id"] in allowed_ids)]
             other = [g for g in groups if (g["id"] not in allowed_ids)]
 
-            # Résumé dispo
             if mine:
                 st.markdown("<div class='ff-muted'>✅ Dispo sur tes applis</div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div class='ff-muted'>❌ Pas dispo sur tes applis</div>", unsafe_allow_html=True)
 
-            # 1) Tes plateformes (affiche au moins 1 lien prioritaire par plateforme)
             if mine:
                 st.markdown("**Tes plateformes :**")
                 for g in mine:
@@ -827,7 +829,6 @@ if raw_items:
                             st.markdown(f"- **{g['name']}** ({p_type}) → {p_link}")
                         else:
                             st.markdown(f"- **{g['name']}** ({p_type}) → *(lien non fourni par l’API)*")
-                    # le reste en "…"
                     if rest:
                         with st.expander(f"… autres options sur {g['name']}"):
                             for o in rest:
@@ -838,7 +839,6 @@ if raw_items:
                                 else:
                                     st.markdown(f"- ({typ}) → *(lien non fourni par l’API)*")
 
-            # 2) Autres plateformes (tout en …)
             if other:
                 with st.expander(f"… Autres plateformes ({len(other)})"):
                     for g in other:
