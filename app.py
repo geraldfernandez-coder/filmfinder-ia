@@ -11,11 +11,22 @@ from dotenv import load_dotenv
 # ================== CONFIG ==================
 load_dotenv()
 
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "").strip()
-RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com").strip()
+def get_secret(name, default=""):
+    if name in st.secrets:
+        return str(st.secrets[name]).strip()
+    return os.getenv(name, default).strip()
+
+RAPIDAPI_KEY = get_secret("RAPIDAPI_KEY")
+RAPIDAPI_HOST = get_secret("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com")
 BASE_URL = "https://streaming-availability.p.rapidapi.com"
 
-OMDB_API_KEY = os.getenv("OMDB_API_KEY", "").strip()
+OLLAMA_URL = get_secret("OLLAMA_URL", "")
+OLLAMA_MODEL = get_secret("OLLAMA_MODEL", "llama3.2:3b")
+
+OMDB_API_KEY = get_secret("OMDB_API_KEY")
+
+XMLTV_TNT_URL = get_secret("XMLTV_TNT_URL")
+TNT_LOOKAHEAD_DAYS = int(get_secret("TNT_LOOKAHEAD_DAYS", "5"))
 
 APP_DIR = Path(__file__).parent
 PROFILE_PATH = APP_DIR / "profile.json"
