@@ -59,7 +59,7 @@ STOPWORDS = {
     "the","a","an","and","or","in","on","with","without","to","of","for","by","from"
 }
 
-# priorité d’affichage des types par plateforme
+# priorité d’affichage des types
 TYPE_PRIORITY = {
     "subscription": 0,
     "free": 1,
@@ -255,7 +255,7 @@ def dedupe_streaming_options(options):
     for o in options or []:
         sid = ((o.get("service") or {}).get("id") or "")
         typ = o.get("type") or ""
-        key = (sid, typ)
+        key = (sid, typ, o.get("link") or o.get("videoLink") or "")
         if key in seen:
             continue
         seen.add(key)
@@ -279,7 +279,7 @@ def search_by_keyword(keyword: str, country: str, show_type: str, lang: str):
     })
     return res.get("shows", []) if isinstance(res, dict) else []
 
-# ✅ NOUVEAU: récupérer le “Get Show” pour obtenir des liens manquants
+# récupérer le “Get Show” pour liens plus complets
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_show_details(show_id: str, country: str, show_type: str, lang: str) -> dict:
     if not show_id:
@@ -293,40 +293,56 @@ def get_show_details(show_id: str, country: str, show_type: str, lang: str) -> d
     except Exception:
         return {}
 
-def best_links_per_service(options: list) -> list:
+def group_options_by_service(options: list) -> list:
     """
-    Retourne une liste d’options, 1 par service, avec la meilleure priorité de type
-    (subscription > free > addon > rent > buy) et avec un lien si possible.
+    Retourne une liste de services:
+    [
+      {"id": "...", "name": "...", "opts":[{"type":"subscription","link":"..."}, ...]},
+      ...
+    ]
+    triée par nom, et options triées par type priority.
     """
-    by_service = {}
+    groups = {}
     for o in options or []:
         s = o.get("service") or {}
-        sid = s.get("id") or ""
-        sname = (s.get("name") or sid or "").strip()
-        typ = (o.get("type") or "").strip().lower()
-        link = o.get("link") or o.get("videoLink") or ""
-
-        if not sname:
+        sid = (s.get("id") or "").strip()
+        name = (s.get("name") or sid or "").strip()
+        if not name:
             continue
+        typ = (o.get("type") or "").strip().lower()
+        link = (o.get("link") or o.get("videoLink") or "").strip()
 
-        pr = TYPE_PRIORITY.get(typ, 99)
-        cur = by_service.get(sname)
+        key = sid if sid else name
+        if key not in groups:
+            groups[key] = {"id": sid, "name": name, "opts": []}
+        groups[key]["opts"].append({"type": typ, "link": link})
 
-        # On préfère une option:
-        # - avec lien
-        # - type plus prioritaire
-        if cur is None:
-            by_service[sname] = {"service": sname, "type": typ, "link": link, "prio": pr}
-        else:
-            cur_has = bool(cur["link"])
-            new_has = bool(link)
-            if (new_has and not cur_has) or (pr < cur["prio"] and (new_has or cur_has)):
-                by_service[sname] = {"service": sname, "type": typ, "link": link, "prio": pr}
+    out = list(groups.values())
+    for g in out:
+        # dedupe options
+        seen = set()
+        ded = []
+        for opt in g["opts"]:
+            k = (opt["type"], opt["link"])
+            if k in seen:
+                continue
+            seen.add(k)
+            ded.append(opt)
+        g["opts"] = ded
+        g["opts"].sort(key=lambda x: TYPE_PRIORITY.get(x["type"], 99))
 
-    # tri alphabétique service
-    out = list(by_service.values())
-    out.sort(key=lambda x: x["service"].lower())
+    out.sort(key=lambda x: x["name"].lower())
     return out
+
+def pick_primary_option(opts: list):
+    """prend subscription si possible, sinon la première selon priorité"""
+    if not opts:
+        return None, []
+    for o in opts:
+        if o["type"] == "subscription":
+            rest = [x for x in opts if x != o]
+            return o, rest
+    return opts[0], opts[1:]
 
 # ================== OMDb ==================
 @st.cache_data(show_spinner=False, ttl=86400)
@@ -487,7 +503,7 @@ def build_raw_items(query: str, mode: str, prof: dict):
 
         raw.append({
             "show": sh,
-            "api_id": sh.get("id"),  # ✅ nécessaire pour /shows/{id}
+            "api_id": sh.get("id"),
             "id": stable_id(sh),
             "title": sh.get("title") or "Sans titre",
             "year": year,
@@ -517,8 +533,7 @@ def apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, 
 
     if platform_filter != "Toutes":
         def okp(it):
-            # on compare par NOM affiché
-            for o in it["opts_mine"]:
+            for o in it["opts_all"]:
                 s = (o.get("service") or {})
                 name = (s.get("name") or s.get("id") or "").strip()
                 if name == platform_filter:
@@ -738,6 +753,8 @@ if raw_items:
     st.markdown(f"<div class='ff-muted'>Requête: {st.session_state.get('raw_query','')}</div>", unsafe_allow_html=True)
     st.write(f"✅ Résultats : {min(len(view), 20)} / {len(view)}")
 
+    allowed_ids = set(profile.get("platform_ids", []))
+
     for it in view[:20]:
         title = it["title"]
         year = it["year"]
@@ -775,41 +792,79 @@ if raw_items:
             if line:
                 st.markdown(line, unsafe_allow_html=True)
 
-            if it["opts_mine"]:
+            # ====== STREAMING: TOUTES plateformes, tes applis d'abord ======
+            opts_all = it.get("opts_all") or []
+            opts_all = dedupe_streaming_options(opts_all)
+
+            # si l'API n'a pas donné tous les liens, on tente /shows/{id} (cache)
+            need_details = (not opts_all) or any(((o.get("link") or o.get("videoLink") or "").strip() == "") for o in opts_all)
+            if need_details and it.get("api_id"):
+                details = get_show_details(str(it["api_id"]), profile["country"], profile["show_type"], profile["lang"])
+                opts_all2 = ((details.get("streamingOptions") or {}).get(profile["country"]) or [])
+                opts_all2 = dedupe_streaming_options(opts_all2)
+                if opts_all2:
+                    opts_all = opts_all2
+
+            groups = group_options_by_service(opts_all)
+            mine = [g for g in groups if (g["id"] in allowed_ids)]
+            other = [g for g in groups if (g["id"] not in allowed_ids)]
+
+            # Résumé dispo
+            if mine:
                 st.markdown("<div class='ff-muted'>✅ Dispo sur tes applis</div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div class='ff-muted'>❌ Pas dispo sur tes applis</div>", unsafe_allow_html=True)
 
-            # ✅ MODIF LIENS: 1 lien par plateforme (et on tente Get Show si manquant)
-            if it["opts_mine"]:
-                best = best_links_per_service(it["opts_mine"])
+            # 1) Tes plateformes (affiche au moins 1 lien prioritaire par plateforme)
+            if mine:
+                st.markdown("**Tes plateformes :**")
+                for g in mine:
+                    primary, rest = pick_primary_option(g["opts"])
+                    if primary:
+                        p_link = primary["link"]
+                        p_type = primary["type"]
+                        if p_link:
+                            st.markdown(f"- **{g['name']}** ({p_type}) → {p_link}")
+                        else:
+                            st.markdown(f"- **{g['name']}** ({p_type}) → *(lien non fourni par l’API)*")
+                    # le reste en "…"
+                    if rest:
+                        with st.expander(f"… autres options sur {g['name']}"):
+                            for o in rest:
+                                link = o["link"]
+                                typ = o["type"]
+                                if link:
+                                    st.markdown(f"- ({typ}) → {link}")
+                                else:
+                                    st.markdown(f"- ({typ}) → *(lien non fourni par l’API)*")
 
-                # s’il manque des liens, on tente Get Show une fois
-                need_more = any((not x["link"]) for x in best)
-                if need_more and it.get("api_id"):
-                    details = get_show_details(str(it["api_id"]), profile["country"], profile["show_type"], profile["lang"])
-                    opts_all2 = ((details.get("streamingOptions") or {}).get(profile["country"]) or [])
-                    opts_all2 = dedupe_streaming_options(opts_all2)
-                    allowed = set(profile.get("platform_ids", []))
-                    mine2 = [o for o in opts_all2 if ((o.get("service") or {}).get("id") in allowed)]
-                    mine2 = dedupe_streaming_options(mine2)
-                    if mine2:
-                        best = best_links_per_service(mine2)
-
-                for x in best:
-                    service = x["service"]
-                    typ = x["type"] or ""
-                    link = x["link"] or ""
-                    if link:
-                        st.markdown(f"- **{service}** ({typ}) → {link}")
-                    else:
-                        st.markdown(f"- **{service}** ({typ}) → *(lien non fourni par l’API)*")
+            # 2) Autres plateformes (tout en …)
+            if other:
+                with st.expander(f"… Autres plateformes ({len(other)})"):
+                    for g in other:
+                        primary, rest = pick_primary_option(g["opts"])
+                        if primary:
+                            p_link = primary["link"]
+                            p_type = primary["type"]
+                            if p_link:
+                                st.markdown(f"- **{g['name']}** ({p_type}) → {p_link}")
+                            else:
+                                st.markdown(f"- **{g['name']}** ({p_type}) → *(lien non fourni par l’API)*")
+                        if rest:
+                            with st.expander(f"… autres options sur {g['name']}"):
+                                for o in rest:
+                                    link = o["link"]
+                                    typ = o["type"]
+                                    if link:
+                                        st.markdown(f"- ({typ}) → {link}")
+                                    else:
+                                        st.markdown(f"- ({typ}) → *(lien non fourni par l’API)*")
 
             with st.expander("Détails", expanded=False):
-                if it["overview"]:
+                if it.get("overview"):
                     st.write(it["overview"])
 
-                if it["actors"]:
+                if it.get("actors"):
                     links = [f"[{a}](?actor={quote(a)})" for a in it["actors"][:10]]
                     st.markdown("**Acteurs :** " + " · ".join(links))
 
