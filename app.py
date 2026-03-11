@@ -11,22 +11,11 @@ from dotenv import load_dotenv
 # ================== CONFIG ==================
 load_dotenv()
 
-def get_secret(name, default=""):
-    if name in st.secrets:
-        return str(st.secrets[name]).strip()
-    return os.getenv(name, default).strip()
-
-RAPIDAPI_KEY = get_secret("RAPIDAPI_KEY")
-RAPIDAPI_HOST = get_secret("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com")
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "").strip()
+RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com").strip()
 BASE_URL = "https://streaming-availability.p.rapidapi.com"
 
-OLLAMA_URL = get_secret("OLLAMA_URL", "")
-OLLAMA_MODEL = get_secret("OLLAMA_MODEL", "llama3.2:3b")
-
-OMDB_API_KEY = get_secret("OMDB_API_KEY")
-
-XMLTV_TNT_URL = get_secret("XMLTV_TNT_URL")
-TNT_LOOKAHEAD_DAYS = int(get_secret("TNT_LOOKAHEAD_DAYS", "5"))
+OMDB_API_KEY = os.getenv("OMDB_API_KEY", "").strip()
 
 APP_DIR = Path(__file__).parent
 PROFILE_PATH = APP_DIR / "profile.json"
@@ -112,18 +101,10 @@ def extract_keywords(text: str, max_words: int = 10) -> str:
             break
     return " ".join(out) if out else text.strip()
 
-def flag_from_iso2(code2: str) -> str:
-    if not code2 or len(code2) != 2:
-        return ""
-    code2 = code2.upper()
-    if not ("A" <= code2[0] <= "Z" and "A" <= code2[1] <= "Z"):
-        return ""
-    return chr(0x1F1E6 + ord(code2[0]) - ord("A")) + chr(0x1F1E6 + ord(code2[1]) - ord("A"))
-
 _COUNTRY_MAP = {
     "france":"FR","fr":"FR",
-    "united states":"US","usa":"US","us":"US","etats unis":"US","états unis":"US",
-    "united kingdom":"GB","uk":"GB","gb":"GB","royaume uni":"GB",
+    "united states":"US","usa":"US","us":"US","united states of america":"US","etats unis":"US","états unis":"US",
+    "united kingdom":"GB","uk":"GB","gb":"GB","great britain":"GB","england":"GB","royaume uni":"GB",
     "japan":"JP","japon":"JP","jp":"JP",
     "korea":"KR","south korea":"KR","corée":"KR","coree":"KR","kr":"KR",
     "spain":"ES","espagne":"ES","es":"ES",
@@ -153,6 +134,15 @@ def iso2_from_country_text(country_text: str) -> str:
     if len(first) == 2:
         return first.upper()
     return _COUNTRY_MAP.get(norm_text(first), "")
+
+# ✅ MODIF DRAPEAU: drapeau en IMAGE (robuste Windows/Chrome)
+def flag_img_html(iso2: str) -> str:
+    if not iso2:
+        return ""
+    iso2 = iso2.strip().lower()
+    if len(iso2) != 2 or not iso2.isalpha():
+        return ""
+    return f'<img src="https://flagcdn.com/24x18/{iso2}.png" style="vertical-align:-3px;margin-right:6px;border-radius:2px;" />'
 
 # ================== STREAMLIT QUERY PARAMS (compat) ==================
 def get_query_params() -> dict:
@@ -224,7 +214,6 @@ def get_services(country: str, lang: str):
 
 @st.cache_data(show_spinner=False, ttl=86400)
 def get_genres(country: str, lang: str):
-    # On tente l’API, sinon fallback
     try:
         data = sa_get("/genres", {"country": country, "output_language": lang})
         items = []
@@ -246,7 +235,6 @@ def get_genres(country: str, lang: str):
     except Exception:
         pass
 
-    # fallback propre
     return [
         "Action","Aventure","Animation","Comédie","Crime","Documentaire","Drame",
         "Familial","Fantastique","Horreur","Mystère","Romance","Science-Fiction",
@@ -271,16 +259,6 @@ def get_poster_url(show: dict):
         return vs.get("w240") or vs.get("w360") or vs.get("w480") or None
     except Exception:
         return None
-
-def search_by_title(title: str, country: str, show_type: str, lang: str):
-    data = sa_get("/shows/search/title", {
-        "title": title,
-        "country": country,
-        "show_type": show_type,
-        "series_granularity": "show",
-        "output_language": lang,
-    })
-    return data if isinstance(data, list) else []
 
 def search_by_keyword(keyword: str, country: str, show_type: str, lang: str):
     res = sa_get("/shows/search/filters", {
@@ -513,7 +491,7 @@ def apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, 
     return items
 
 # ================== NAV / SESSION ==================
-st.session_state.setdefault("did_enter", False)  # Accueil à chaque "vraie" session jusqu'à Entrer 🍿
+st.session_state.setdefault("did_enter", False)  # Accueil jusqu'à "Entrer 🍿"
 st.session_state.setdefault("page", "Accueil" if not st.session_state["did_enter"] else "Recherche")
 st.session_state.setdefault("raw_items", [])
 st.session_state.setdefault("raw_query", "")
@@ -628,7 +606,6 @@ if page == "Profil":
             st.success("OK")
             st.rerun()
 
-    # petit reset si besoin
     if st.button("↩️ Revenir à l'accueil (session)"):
         st.session_state["did_enter"] = False
         st.session_state["page"] = "Accueil"
@@ -638,6 +615,13 @@ if page == "Profil":
 
 # -------- RECHERCHE --------
 st.markdown("# Recherche")
+
+# sécurité : pas de plateforme => retour accueil
+if not profile.get("platform_ids"):
+    st.warning("Choisis au moins 1 plateforme dans Accueil/Profil.")
+    st.session_state["did_enter"] = False
+    st.session_state["page"] = "Accueil"
+    st.rerun()
 
 mode = st.radio("Mode", ["Rapide","Normal","Profond"], horizontal=True, index=1)
 
@@ -660,7 +644,7 @@ if submitted:
 
 raw_items = st.session_state.get("raw_items", [])
 
-# ✅ GENRES dispo AVANT la recherche (API ou fallback)
+# ✅ GENRES dispo AVANT recherche
 genre_choices = ["Tous"] + get_genres(profile["country"], profile["lang"])
 
 # plateformes (issues du profil)
@@ -688,7 +672,7 @@ genre_filter = st.selectbox("Genre", genre_choices, index=0)
 if raw_items:
     view = apply_filters_and_sort(
         raw_items, sort_mode=sort_mode, only_my_apps=only_my_apps,
-        platform_filter="Toutes" if platform_filter=="Toutes" else platform_filter,
+        platform_filter=platform_filter,
         year_min=year_min, year_max=year_max,
         genre_filter=genre_filter
     )
@@ -701,19 +685,21 @@ if raw_items:
         year = it["year"]
         poster = it["poster"]
 
+        star = stars_html(it["score100"])
+        score5 = None if it["score100"] is None else round(float(it["score100"]) / 20.0, 1)
+
+        # ✅ MODIF DRAPEAU: on calcule ISO + image
         country_label = ""
-        flag = ""
+        iso = ""
         if it.get("country_text"):
             country_label = it["country_text"].split(",")[0].strip()
             iso = iso2_from_country_text(it["country_text"])
-            flag = flag_from_iso2(iso) if iso else ""
         elif it.get("origin_fallback"):
-            iso = iso2_from_country_text(it["origin_fallback"])
-            flag = flag_from_iso2(iso) if iso else ""
             country_label = it["origin_fallback"]
+            iso = iso2_from_country_text(it["origin_fallback"])
 
-        star = stars_html(it["score100"])
-        score5 = None if it["score100"] is None else round(float(it["score100"]) / 20.0, 1)
+        flag_html = flag_img_html(iso)
+        shown_country = country_label if country_label else (iso.upper() if iso else "")
 
         c_img, c_txt = st.columns([1, 3])
         with c_img:
@@ -723,10 +709,14 @@ if raw_items:
         with c_txt:
             st.markdown(f"### {title} ({year if year else ''})")
 
+            # ✅ note + drapeau/pays (même ligne)
+            line = ""
             if star:
-                label = f"<span class='ff-muted' style='margin-left:8px'>({score5}/5)</span>" if score5 is not None else ""
-                fl = f"<span class='ff-muted' style='margin-left:10px'>{flag} {country_label}</span>" if (flag or country_label) else ""
-                st.markdown(f"{star}{label}{fl}", unsafe_allow_html=True)
+                line += f'{star}<span class="ff-muted" style="margin-left:8px">({score5}/5)</span>'
+            if shown_country:
+                line += f'<span class="ff-muted" style="margin-left:12px">{flag_html}{shown_country}</span>'
+            if line:
+                st.markdown(line, unsafe_allow_html=True)
 
             if it["opts_mine"]:
                 st.markdown("<div class='ff-muted'>✅ Dispo sur tes applis</div>", unsafe_allow_html=True)
