@@ -24,10 +24,17 @@ st.set_page_config(page_title="FilmFinder IA", layout="centered")
 
 # ================== STYLE ==================
 def apply_theme():
+    # Force un rendu clair lisible même si navigateur/OS est en dark mode
     st.markdown(
         """
         <style>
-        html, body, .stApp, [data-testid="stAppViewContainer"] { background: #f4f6f8 !important; }
+        :root { color-scheme: light !important; }
+
+        html, body, .stApp, [data-testid="stAppViewContainer"] {
+            background: #f4f6f8 !important;
+            color: #111111 !important;
+        }
+
         .main .block-container{
             max-width: 1040px !important;
             margin: 12px auto !important;
@@ -36,14 +43,50 @@ def apply_theme():
             padding: 16px 20px 22px 20px !important;
             box-shadow: 0 10px 35px rgba(0,0,0,0.08) !important;
         }
+
         [data-testid="stSidebar"] > div:first-child{
             background: #ffffff !important;
             border-right: 1px solid rgba(0,0,0,0.06);
         }
+
+        /* Texte markdown */
+        [data-testid="stMarkdownContainer"], 
+        [data-testid="stMarkdownContainer"] * {
+            color: #111111 !important;
+        }
+
+        /* Labels */
+        label, .stSelectbox label, .stTextInput label, .stTextArea label, .stCheckbox label {
+            color: #111111 !important;
+        }
+
+        /* Inputs */
+        input, textarea {
+            background: #ffffff !important;
+            color: #111111 !important;
+            border-color: rgba(0,0,0,0.18) !important;
+        }
+
+        /* Select (BaseWeb) */
+        [data-baseweb="select"] > div {
+            background: #ffffff !important;
+            color: #111111 !important;
+            border-color: rgba(0,0,0,0.18) !important;
+        }
+        [data-baseweb="select"] * { color: #111111 !important; }
+
+        /* Expander */
+        [data-testid="stExpander"] {
+            background: #ffffff !important;
+            border-color: rgba(0,0,0,0.10) !important;
+        }
+
         .ff-muted{ color: rgba(0,0,0,0.65) !important; font-size: 13px; }
+
+        /* étoiles */
         .ff-stars{position:relative;display:inline-block;font-size:16px;line-height:1;letter-spacing:1px}
-        .ff-stars .bot{color:#d0d0d0;display:block}
-        .ff-stars .top{color:#f5c518;position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;display:block}
+        .ff-stars .bot{color:#d0d0d0 !important;display:block}
+        .ff-stars .top{color:#f5c518 !important;position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;display:block}
         </style>
         """,
         unsafe_allow_html=True,
@@ -428,7 +471,6 @@ def parse_genres(show: dict):
             res.append(a)
     return res
 
-# --- show_type selection in Recherche ---
 def showtype_to_list(choice: str):
     if choice == "Film":
         return ["movie"]
@@ -516,7 +558,6 @@ def build_raw_items(query: str, mode: str, prof: dict, show_types: list):
     raw.sort(key=lambda x: x["rel"], reverse=True)
     return raw[:pre["pool"]]
 
-# ✅ MODIF: filtre année en slider (year_range) au lieu de min/max 0/0
 def apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, year_range, genre_filter):
     items = list(raw_items)
 
@@ -535,7 +576,6 @@ def apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, 
         k = [x for x in items if okp(x)]
         items = k if k else items
 
-    # année (slider)
     if year_range:
         y0, y1 = year_range
         items = [x for x in items if x["year"] is None or (x["year"] >= y0 and x["year"] <= y1)]
@@ -564,18 +604,12 @@ st.session_state.setdefault("page", "Accueil" if not st.session_state["did_enter
 st.session_state.setdefault("raw_items", [])
 st.session_state.setdefault("raw_query", "")
 
-# acteur via URL (inchangé)
 qp = get_query_params()
-actor_param = None
 if "actor" in qp:
-    v = qp.get("actor")
-    actor_param = v[0] if isinstance(v, list) and v else (v if isinstance(v, str) else None)
-if actor_param:
     clear_query_params()
     st.session_state["did_enter"] = True
     st.session_state["page"] = "Recherche"
 
-# ================== SIDEBAR ==================
 with st.sidebar:
     st.markdown("## FilmFinder IA")
     if st.session_state["did_enter"]:
@@ -584,7 +618,6 @@ with st.sidebar:
     else:
         st.caption("Démarrage (Accueil)")
 
-# ================== PAGES ==================
 page = st.session_state["page"]
 
 # -------- ACCUEIL --------
@@ -682,7 +715,7 @@ if not profile.get("platform_ids"):
     st.session_state["page"] = "Accueil"
     st.rerun()
 
-# ✅ Film/Série ici (pas dans profil)
+# Film/Série/Les deux sur Recherche
 show_choice = st.selectbox("Je cherche :", ["Film", "Série", "Les deux"], index=2)
 show_types = showtype_to_list(show_choice)
 
@@ -712,25 +745,29 @@ services = get_services(profile["country"], profile["lang"])
 id_to_name = {s.get("id"): (s.get("name") or s.get("id")) for s in services}
 platform_choices = ["Toutes"] + sorted([id_to_name.get(i, i) for i in profile.get("platform_ids", [])])
 
-# filtres (année = slider seulement si résultats)
-c1, c2, c3 = st.columns([2.2, 1.1, 1.6])
-with c1:
-    sort_mode = st.selectbox("Trier par", ["Pertinence","Année (récent)","Note (haute)"], index=0)
-with c2:
-    only_my_apps = st.checkbox("Mes applis", value=False)
-with c3:
-    platform_filter = st.selectbox("Plateforme", platform_choices, index=0)
-
-genre_filter = st.selectbox("Genre", genre_choices, index=0)
-
+# ✅ Filtres dans un expander
+sort_mode = "Pertinence"
+only_my_apps = False
+platform_filter = "Toutes"
+genre_filter = "Tous"
 year_range = None
-years = sorted({x["year"] for x in raw_items if x.get("year")})
-if years:
-    y_min, y_max = min(years), max(years)
-    if y_min != y_max:
-        year_range = st.slider("Année (min–max)", min_value=int(y_min), max_value=int(y_max), value=(int(y_min), int(y_max)))
-    # si y_min == y_max, pas besoin de slider
-# sinon: pas d’affichage année (ça évite tes 0/0 inutiles)
+
+with st.expander("Filtres avancés…", expanded=False):
+    c1, c2, c3 = st.columns([2.2, 1.1, 1.6])
+    with c1:
+        sort_mode = st.selectbox("Trier par", ["Pertinence","Année (récent)","Note (haute)"], index=0)
+    with c2:
+        only_my_apps = st.checkbox("Mes applis", value=False)
+    with c3:
+        platform_filter = st.selectbox("Plateforme", platform_choices, index=0)
+
+    genre_filter = st.selectbox("Genre", genre_choices, index=0)
+
+    years = sorted({x["year"] for x in raw_items if x.get("year")})
+    if years:
+        y_min, y_max = min(years), max(years)
+        if y_min != y_max:
+            year_range = st.slider("Année (min–max)", min_value=int(y_min), max_value=int(y_max), value=(int(y_min), int(y_max)))
 
 if raw_items:
     view = apply_filters_and_sort(
@@ -748,12 +785,10 @@ if raw_items:
     allowed_ids = set(profile.get("platform_ids", []))
 
     def details_with_fallback(api_id: str):
-        # pour "Les deux", l'API veut un show_type: on tente dans l'ordre choisi
         for stype in show_types:
             d = get_show_details(api_id, profile["country"], stype, profile["lang"])
             if d:
                 return d
-        # fallback extra si les deux
         if show_types == ["movie", "series"]:
             d = get_show_details(api_id, profile["country"], "series", profile["lang"])
             if d: return d
@@ -797,7 +832,7 @@ if raw_items:
             if line:
                 st.markdown(line, unsafe_allow_html=True)
 
-            # plateformes
+            # ===== STREAMING: toutes plateformes, tes applis d'abord =====
             opts_all = it.get("opts_all") or []
             opts_all = dedupe_streaming_options(opts_all)
 
