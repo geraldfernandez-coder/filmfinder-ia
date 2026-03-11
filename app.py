@@ -59,6 +59,15 @@ STOPWORDS = {
     "the","a","an","and","or","in","on","with","without","to","of","for","by","from"
 }
 
+# priorité d’affichage des types par plateforme
+TYPE_PRIORITY = {
+    "subscription": 0,
+    "free": 1,
+    "addon": 2,
+    "rent": 3,
+    "buy": 4,
+}
+
 def norm_text(s: str) -> str:
     if not s:
         return ""
@@ -135,7 +144,7 @@ def iso2_from_country_text(country_text: str) -> str:
         return first.upper()
     return _COUNTRY_MAP.get(norm_text(first), "")
 
-# ✅ MODIF DRAPEAU: drapeau en IMAGE (robuste Windows/Chrome)
+# drapeau en image (robuste Windows/Chrome)
 def flag_img_html(iso2: str) -> str:
     if not iso2:
         return ""
@@ -269,6 +278,55 @@ def search_by_keyword(keyword: str, country: str, show_type: str, lang: str):
         "output_language": lang,
     })
     return res.get("shows", []) if isinstance(res, dict) else []
+
+# ✅ NOUVEAU: récupérer le “Get Show” pour obtenir des liens manquants
+@st.cache_data(show_spinner=False, ttl=3600)
+def get_show_details(show_id: str, country: str, show_type: str, lang: str) -> dict:
+    if not show_id:
+        return {}
+    try:
+        return sa_get(f"/shows/{show_id}", {
+            "country": country,
+            "show_type": show_type,
+            "output_language": lang,
+        })
+    except Exception:
+        return {}
+
+def best_links_per_service(options: list) -> list:
+    """
+    Retourne une liste d’options, 1 par service, avec la meilleure priorité de type
+    (subscription > free > addon > rent > buy) et avec un lien si possible.
+    """
+    by_service = {}
+    for o in options or []:
+        s = o.get("service") or {}
+        sid = s.get("id") or ""
+        sname = (s.get("name") or sid or "").strip()
+        typ = (o.get("type") or "").strip().lower()
+        link = o.get("link") or o.get("videoLink") or ""
+
+        if not sname:
+            continue
+
+        pr = TYPE_PRIORITY.get(typ, 99)
+        cur = by_service.get(sname)
+
+        # On préfère une option:
+        # - avec lien
+        # - type plus prioritaire
+        if cur is None:
+            by_service[sname] = {"service": sname, "type": typ, "link": link, "prio": pr}
+        else:
+            cur_has = bool(cur["link"])
+            new_has = bool(link)
+            if (new_has and not cur_has) or (pr < cur["prio"] and (new_has or cur_has)):
+                by_service[sname] = {"service": sname, "type": typ, "link": link, "prio": pr}
+
+    # tri alphabétique service
+    out = list(by_service.values())
+    out.sort(key=lambda x: x["service"].lower())
+    return out
 
 # ================== OMDb ==================
 @st.cache_data(show_spinner=False, ttl=86400)
@@ -429,6 +487,7 @@ def build_raw_items(query: str, mode: str, prof: dict):
 
         raw.append({
             "show": sh,
+            "api_id": sh.get("id"),  # ✅ nécessaire pour /shows/{id}
             "id": stable_id(sh),
             "title": sh.get("title") or "Sans titre",
             "year": year,
@@ -458,6 +517,7 @@ def apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, 
 
     if platform_filter != "Toutes":
         def okp(it):
+            # on compare par NOM affiché
             for o in it["opts_mine"]:
                 s = (o.get("service") or {})
                 name = (s.get("name") or s.get("id") or "").strip()
@@ -616,7 +676,6 @@ if page == "Profil":
 # -------- RECHERCHE --------
 st.markdown("# Recherche")
 
-# sécurité : pas de plateforme => retour accueil
 if not profile.get("platform_ids"):
     st.warning("Choisis au moins 1 plateforme dans Accueil/Profil.")
     st.session_state["did_enter"] = False
@@ -630,7 +689,6 @@ def do_search(q: str):
     st.session_state["raw_items"] = raw
     st.session_state["raw_query"] = q
 
-# ✅ Entrée fiable = FORM
 with st.form("search_form", clear_on_submit=False):
     q_main = st.text_input("Ton souvenir (Entrée lance)", key="q_main")
     q_more = st.text_area("Détails (optionnel)", key="q_more", height=70,
@@ -644,7 +702,7 @@ if submitted:
 
 raw_items = st.session_state.get("raw_items", [])
 
-# ✅ GENRES dispo AVANT recherche
+# genres dispo avant recherche
 genre_choices = ["Tous"] + get_genres(profile["country"], profile["lang"])
 
 # plateformes (issues du profil)
@@ -652,7 +710,7 @@ services = get_services(profile["country"], profile["lang"])
 id_to_name = {s.get("id"): (s.get("name") or s.get("id")) for s in services}
 platform_choices = ["Toutes"] + sorted([id_to_name.get(i, i) for i in profile.get("platform_ids", [])])
 
-# filtres catégories (auto-refresh)
+# filtres
 c1, c2, c3, c4, c5 = st.columns([2.2, 1.1, 1.6, 1.2, 1.8])
 with c1:
     sort_mode = st.selectbox("Trier par", ["Pertinence","Année (récent)","Note (haute)"], index=0)
@@ -688,7 +746,7 @@ if raw_items:
         star = stars_html(it["score100"])
         score5 = None if it["score100"] is None else round(float(it["score100"]) / 20.0, 1)
 
-        # ✅ MODIF DRAPEAU: on calcule ISO + image
+        # drapeau/pays
         country_label = ""
         iso = ""
         if it.get("country_text"):
@@ -709,7 +767,6 @@ if raw_items:
         with c_txt:
             st.markdown(f"### {title} ({year if year else ''})")
 
-            # ✅ note + drapeau/pays (même ligne)
             line = ""
             if star:
                 line += f'{star}<span class="ff-muted" style="margin-left:8px">({score5}/5)</span>'
@@ -723,14 +780,30 @@ if raw_items:
             else:
                 st.markdown("<div class='ff-muted'>❌ Pas dispo sur tes applis</div>", unsafe_allow_html=True)
 
+            # ✅ MODIF LIENS: 1 lien par plateforme (et on tente Get Show si manquant)
             if it["opts_mine"]:
-                for o in it["opts_mine"][:4]:
-                    s = (o.get("service") or {})
-                    name = s.get("name", s.get("id", "service"))
-                    typ = o.get("type", "")
-                    link = o.get("link") or o.get("videoLink")
+                best = best_links_per_service(it["opts_mine"])
+
+                # s’il manque des liens, on tente Get Show une fois
+                need_more = any((not x["link"]) for x in best)
+                if need_more and it.get("api_id"):
+                    details = get_show_details(str(it["api_id"]), profile["country"], profile["show_type"], profile["lang"])
+                    opts_all2 = ((details.get("streamingOptions") or {}).get(profile["country"]) or [])
+                    opts_all2 = dedupe_streaming_options(opts_all2)
+                    allowed = set(profile.get("platform_ids", []))
+                    mine2 = [o for o in opts_all2 if ((o.get("service") or {}).get("id") in allowed)]
+                    mine2 = dedupe_streaming_options(mine2)
+                    if mine2:
+                        best = best_links_per_service(mine2)
+
+                for x in best:
+                    service = x["service"]
+                    typ = x["type"] or ""
+                    link = x["link"] or ""
                     if link:
-                        st.markdown(f"- **{name}** ({typ}) → {link}")
+                        st.markdown(f"- **{service}** ({typ}) → {link}")
+                    else:
+                        st.markdown(f"- **{service}** ({typ}) → *(lien non fourni par l’API)*")
 
             with st.expander("Détails", expanded=False):
                 if it["overview"]:
