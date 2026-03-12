@@ -427,42 +427,15 @@ def pick_primary_option(opts: list):
 # THÈME AUTO
 # =========================================================
 THEMES = {
-    "Cinéma vintage": {
-        "accent": "#b85c38",
-        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
-    },
-    "Romance": {
-        "accent": "#ff4d6d",
-        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
-    },
-    "Science-fiction": {
-        "accent": "#00d4ff",
-        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
-    },
-    "Horreur": {
-        "accent": "#ff0033",
-        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
-    },
-    "Été": {
-        "accent": "#ffb703",
-        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
-    },
-    "Halloween": {
-        "accent": "#ff7a00",
-        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
-    },
-    "Armistice": {
-        "accent": "#3a86ff",
-        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
-    },
-    "Fête des mères": {
-        "accent": "#ff7aa2",
-        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
-    },
-    "Printemps": {
-        "accent": "#4caf50",
-        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
-    },
+    "Cinéma vintage": {"accent": "#b85c38"},
+    "Romance": {"accent": "#ff4d6d"},
+    "Science-fiction": {"accent": "#00d4ff"},
+    "Horreur": {"accent": "#ff0033"},
+    "Été": {"accent": "#ffb703"},
+    "Halloween": {"accent": "#ff7a00"},
+    "Armistice": {"accent": "#3a86ff"},
+    "Fête des mères": {"accent": "#ff7aa2"},
+    "Printemps": {"accent": "#4caf50"},
 }
 
 THEME_SEED_TITLES = {
@@ -526,7 +499,6 @@ def get_theme_background_poster(theme_name: str, country: str, lang: str):
 
 def apply_global_css(theme_name: str, poster_url: str):
     accent = THEMES[theme_name]["accent"]
-    panel_bg = THEMES[theme_name]["panel_bg"]
     safe_url = safe_css_url(poster_url)
 
     css = f"""
@@ -537,7 +509,7 @@ def apply_global_css(theme_name: str, poster_url: str):
 
     html, body, .stApp, [data-testid="stAppViewContainer"] {{
         background-image:
-            linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.56)),
+            linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.58)),
             url("{safe_url}") !important;
         background-size: cover !important;
         background-position: center center !important;
@@ -558,7 +530,7 @@ def apply_global_css(theme_name: str, poster_url: str):
                 rgba(0,0,0,0.015) 2px,
                 rgba(0,0,0,0.015) 3px
             );
-        opacity: 0.10;
+        opacity: 0.08;
         z-index: 0;
     }}
 
@@ -578,8 +550,21 @@ def apply_global_css(theme_name: str, poster_url: str):
         border-right: 1px solid rgba(0,0,0,0.08) !important;
     }}
 
+    .ff-pilllabel {{
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,244,244,0.96));
+        color: #111111 !important;
+        border: 1px solid rgba(220,220,220,0.95);
+        margin-bottom: 6px;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.10);
+        font-size: 13px;
+        font-weight: 600;
+    }}
+
     .ff-panel {{
-        background: {panel_bg};
+        background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95));
         border: 1px solid rgba(220,220,220,0.95);
         border-radius: 16px;
         padding: 12px;
@@ -592,17 +577,22 @@ def apply_global_css(theme_name: str, poster_url: str):
         font-size: 13px;
     }}
 
-    .ff-pilllabel {{
-        display: inline-block;
-        padding: 5px 10px;
-        border-radius: 10px;
-        background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,244,244,0.96));
+    input, textarea {{
+        background: #ffffff !important;
         color: #111111 !important;
-        border: 1px solid rgba(220,220,220,0.95);
-        margin-bottom: 6px;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.10);
-        font-size: 13px;
-        font-weight: 600;
+        border: 1px solid rgba(220,220,220,0.95) !important;
+        border-radius: 12px !important;
+    }}
+
+    [data-baseweb="select"] > div {{
+        background: #ffffff !important;
+        color: #111111 !important;
+        border: 1px solid rgba(220,220,220,0.95) !important;
+        border-radius: 12px !important;
+    }}
+
+    [data-baseweb="select"] * {{
+        color: #111111 !important;
     }}
 
     .stButton > button,
@@ -661,6 +651,44 @@ def apply_global_css(theme_name: str, poster_url: str):
         overflow: hidden;
         white-space: nowrap;
         display: block;
+    }}
+
+    .ff-x-holder {{
+        margin-left: -48px;
+        z-index: 10;
+        position: relative;
+        top: 2px;
+    }}
+
+    .ff-x-holder button {{
+        width: 38px !important;
+        min-width: 38px !important;
+        min-height: 34px !important;
+        height: 34px !important;
+        border-radius: 10px !important;
+        padding: 0 !important;
+        font-size: 18px !important;
+    }}
+
+    .ff-banner {{
+        position: relative;
+        min-height: 250px;
+        border-radius: 22px;
+        overflow: hidden;
+        margin-bottom: 18px;
+        box-shadow: 0 14px 30px rgba(0,0,0,0.22);
+        border: 1px solid rgba(255,255,255,0.35);
+        background-image:
+            linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.40)),
+            url("{safe_url}");
+        background-size: cover;
+        background-position: center;
+    }}
+
+    @media (max-width: 768px) {{
+        .ff-banner {{
+            min-height: 180px;
+        }}
     }}
     </style>
     """
@@ -1037,7 +1065,7 @@ def build_raw_items(story: str, actor: str, mode: str, prof: dict, show_types: l
     return raw[: pre["pool"]]
 
 
-def apply_filters_and_sort(items, sort_mode, only_my_apps, platform_filter):
+def apply_filters_and_sort(items, sort_mode, only_my_apps, platform_filter, year_range):
     out = list(items)
 
     if only_my_apps:
@@ -1055,6 +1083,10 @@ def apply_filters_and_sort(items, sort_mode, only_my_apps, platform_filter):
 
         filtered = [x for x in out if ok_platform(x)]
         out = filtered if filtered else out
+
+    if year_range:
+        y0, y1 = year_range
+        out = [x for x in out if x["year"] is None or (x["year"] >= y0 and x["year"] <= y1)]
 
     if sort_mode == "Pertinence":
         out.sort(
@@ -1081,27 +1113,30 @@ def apply_filters_and_sort(items, sort_mode, only_my_apps, platform_filter):
 st.session_state.setdefault("did_enter", False)
 st.session_state.setdefault("page", "Accueil" if not st.session_state["did_enter"] else "Recherche")
 st.session_state.setdefault("raw_items", [])
+st.session_state.setdefault("story_input", "")
+st.session_state.setdefault("actor_input", "")
+st.session_state.setdefault("show_choice", "Films")
+st.session_state.setdefault("mode_choice", "Normal")
+st.session_state.setdefault("sort_choice", "Pertinence")
+st.session_state.setdefault("platform_choice", "Toutes")
+st.session_state.setdefault("only_apps_choice", False)
+st.session_state.setdefault("open_details_id", None)
 st.session_state.setdefault("scroll_to_results", False)
-
-# Hidden bridge fields
-st.session_state.setdefault("ff_story", "")
-st.session_state.setdefault("ff_actor", "")
-st.session_state.setdefault("ff_type", "Films")
-st.session_state.setdefault("ff_mode", "Normal")
-st.session_state.setdefault("ff_sort", "Pertinence")
-st.session_state.setdefault("ff_platform", "Toutes")
-st.session_state.setdefault("ff_only_apps", "0")
+st.session_state.setdefault("restore_card_id", None)
+st.session_state.setdefault("auto_search", False)
 
 qp = get_query_params()
 if "actor" in qp:
     val = qp.get("actor")
     actor_param = val[0] if isinstance(val, list) and val else (val if isinstance(val, str) else "")
     clear_query_params()
-    st.session_state["ff_actor"] = actor_param
-    st.session_state["ff_story"] = ""
-    st.session_state["ff_type"] = "Films"
+    st.session_state["actor_input"] = actor_param
+    st.session_state["story_input"] = ""
+    st.session_state["show_choice"] = "Films"
+    st.session_state["mode_choice"] = "Normal"
     st.session_state["did_enter"] = True
     st.session_state["page"] = "Recherche"
+    st.session_state["auto_search"] = True
 
 # =========================================================
 # SIDEBAR
@@ -1122,45 +1157,42 @@ with st.sidebar:
 page = st.session_state["page"]
 
 # =========================================================
+# HELPERS UI
+# =========================================================
+def draw_banner():
+    st.markdown('<div class="ff-banner"></div>', unsafe_allow_html=True)
+
+def pill_label(text: str):
+    st.markdown(f'<div class="ff-pilllabel">{text}</div>', unsafe_allow_html=True)
+
+def do_search():
+    story = st.session_state.get("story_input", "").strip()
+    actor = st.session_state.get("actor_input", "").strip()
+    if not story and not actor:
+        return
+    st.session_state["raw_items"] = build_raw_items(
+        story,
+        actor,
+        st.session_state.get("mode_choice", "Normal"),
+        profile,
+        showtype_to_list(st.session_state.get("show_choice", "Films")),
+    )
+    st.session_state["open_details_id"] = None
+    st.session_state["scroll_to_results"] = True
+    st.session_state["restore_card_id"] = None
+
+def clear_story():
+    st.session_state["story_input"] = ""
+
+def clear_actor():
+    st.session_state["actor_input"] = ""
+
+# =========================================================
 # ACCUEIL
 # =========================================================
 if page == "Accueil":
     st.markdown("# FilmFinder IA")
-
-    hero = f"""
-    <div class="ff-panel" style="padding:0;overflow:hidden;background:transparent;border:none;box-shadow:none;">
-      <div style="
-        position:relative; min-height:220px; border-radius:18px; overflow:hidden;
-        box-shadow:0 12px 26px rgba(0,0,0,0.18);
-        border:1px solid rgba(255,255,255,0.55);
-      ">
-        <div style="
-          position:absolute; inset:0;
-          background-image:url('{safe_css_url(ACTIVE_THEME_POSTER)}');
-          background-size:cover;
-          background-position:center;
-          transform:scale(1.03);
-        "></div>
-        <div style="position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.66));"></div>
-        <div style="position:relative; z-index:2; padding:18px; min-height:220px; display:flex; align-items:flex-end;">
-          <div style="
-            background:linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95));
-            color:#111; padding:12px 14px; border-radius:16px; max-width:720px;
-            border:1px solid rgba(220,220,220,0.95);
-            box-shadow:0 6px 18px rgba(0,0,0,0.14);
-          ">
-            <div style="font-size:28px; font-weight:800; margin-bottom:4px;">
-              🎬 FilmFinder IA
-            </div>
-            <div style="font-size:14px;">
-              Choisis tes plateformes une fois, puis entre.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    """
-    st.markdown(hero, unsafe_allow_html=True)
+    draw_banner()
 
     if not RAPIDAPI_KEY:
         st.error("RAPIDAPI_KEY manquante dans .env")
@@ -1169,7 +1201,7 @@ if page == "Accueil":
     with st.form("welcome_profile"):
         left, right = st.columns(2)
         with left:
-            st.markdown('<div class="ff-pilllabel">Pays</div>', unsafe_allow_html=True)
+            pill_label("Pays")
             country = st.selectbox(
                 "Pays",
                 ["fr", "be", "ch", "gb", "us"],
@@ -1177,7 +1209,7 @@ if page == "Accueil":
                 label_visibility="collapsed",
             )
         with right:
-            st.markdown('<div class="ff-pilllabel">Langue</div>', unsafe_allow_html=True)
+            pill_label("Langue")
             lang = st.selectbox(
                 "Langue",
                 ["fr", "en"],
@@ -1185,7 +1217,7 @@ if page == "Accueil":
                 label_visibility="collapsed",
             )
 
-        st.markdown('<div class="ff-pilllabel">Tes plateformes</div>', unsafe_allow_html=True)
+        pill_label("Tes plateformes")
         services = get_services(country, lang)
         name_to_id = {
             (s.get("name") or s.get("id")): s.get("id")
@@ -1224,11 +1256,12 @@ if page == "Accueil":
 # =========================================================
 if page == "Profil":
     st.markdown("# Profil")
+    draw_banner()
 
     with st.form("profile_form"):
         left, right = st.columns(2)
         with left:
-            st.markdown('<div class="ff-pilllabel">Pays</div>', unsafe_allow_html=True)
+            pill_label("Pays")
             country = st.selectbox(
                 "Pays",
                 ["fr", "be", "ch", "gb", "us"],
@@ -1236,7 +1269,7 @@ if page == "Profil":
                 label_visibility="collapsed",
             )
         with right:
-            st.markdown('<div class="ff-pilllabel">Langue</div>', unsafe_allow_html=True)
+            pill_label("Langue")
             lang = st.selectbox(
                 "Langue",
                 ["fr", "en"],
@@ -1244,7 +1277,7 @@ if page == "Profil":
                 label_visibility="collapsed",
             )
 
-        st.markdown('<div class="ff-pilllabel">Tes plateformes</div>', unsafe_allow_html=True)
+        pill_label("Tes plateformes")
         services = get_services(country, lang)
         name_to_id = {
             (s.get("name") or s.get("id")): s.get("id")
@@ -1283,7 +1316,7 @@ if page == "Profil":
     st.stop()
 
 # =========================================================
-# RECHERCHE - HIDDEN BRIDGE WIDGETS
+# RECHERCHE
 # =========================================================
 if not profile.get("platform_ids"):
     st.warning("Choisis au moins 1 plateforme dans Accueil/Profil.")
@@ -1291,480 +1324,87 @@ if not profile.get("platform_ids"):
     st.session_state["page"] = "Accueil"
     st.rerun()
 
-_ = st.text_input("__ff_story__", key="ff_story")
-_ = st.text_input("__ff_actor__", key="ff_actor")
-_ = st.text_input("__ff_type__", key="ff_type")
-_ = st.text_input("__ff_mode__", key="ff_mode")
-_ = st.text_input("__ff_sort__", key="ff_sort")
-_ = st.text_input("__ff_platform__", key="ff_platform")
-_ = st.text_input("__ff_only_apps__", key="ff_only_apps")
-search_clicked = st.button("__ff_search__", key="ff_search_btn")
+st.markdown("# Recherche")
+draw_banner()
 
-if search_clicked:
-    st.session_state["scroll_to_results"] = True
+row_a, row_b = st.columns(2)
+with row_a:
+    pill_label("Je cherche")
+    st.selectbox(
+        "Je cherche",
+        ["Films", "Séries", "Films et séries"],
+        key="show_choice",
+        label_visibility="collapsed",
+    )
+with row_b:
+    pill_label("Mode")
+    st.radio(
+        "Mode",
+        ["Rapide", "Normal", "Profond"],
+        key="mode_choice",
+        horizontal=True,
+        label_visibility="collapsed",
+    )
 
-# =========================================================
-# RECHERCHE - UI CUSTOM
-# =========================================================
+st.markdown('<div class="ff-panel ff-muted">Astuce • Acteur seul = OK • Clique acteur = films</div>', unsafe_allow_html=True)
+
+pill_label("Histoire / souvenir / titre exact")
+c_story, c_x1 = st.columns([0.965, 0.035])
+with c_story:
+    st.text_input(
+        "Histoire / souvenir / titre exact",
+        key="story_input",
+        placeholder="Ex: Seul au monde ou un homme rescapé d'un crash avion sur une île déserte",
+        label_visibility="collapsed",
+    )
+with c_x1:
+    st.markdown('<div class="ff-x-holder">', unsafe_allow_html=True)
+    st.button("✕", key="clear_story_btn", help="Effacer", on_click=clear_story)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+pill_label("Acteur/actrice (optionnel)")
+c_actor, c_x2 = st.columns([0.965, 0.035])
+with c_actor:
+    st.text_input(
+        "Acteur/actrice (optionnel)",
+        key="actor_input",
+        placeholder="Ex: Tom Hanks",
+        label_visibility="collapsed",
+    )
+with c_x2:
+    st.markdown('<div class="ff-x-holder">', unsafe_allow_html=True)
+    st.button("✕", key="clear_actor_btn", help="Effacer", on_click=clear_actor)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+search_now = st.button("Chercher", key="search_btn")
+
 services = get_services(profile["country"], profile["lang"])
 id_to_name = {s.get("id"): (s.get("name") or s.get("id")) for s in services}
 platform_choices = ["Toutes"] + sorted(
     [id_to_name.get(i, i) for i in profile.get("platform_ids", [])]
 )
 
-def search_component_html():
-    theme_bg = safe_css_url(ACTIVE_THEME_POSTER)
-    current_story = esc(st.session_state.get("ff_story", ""))
-    current_actor = esc(st.session_state.get("ff_actor", ""))
-    current_type = esc(st.session_state.get("ff_type", "Films"))
-    current_mode = esc(st.session_state.get("ff_mode", "Normal"))
-    current_sort = esc(st.session_state.get("ff_sort", "Pertinence"))
-    current_platform = esc(st.session_state.get("ff_platform", "Toutes"))
-    current_only = "checked" if st.session_state.get("ff_only_apps", "0") == "1" else ""
-
-    type_options = ["Films", "Séries", "Films et séries"]
-    mode_options = ["Rapide", "Normal", "Profond"]
-    sort_options = ["Pertinence", "Année (récent)", "Année (ancien)", "Note (haute)"]
-
-    type_opts_html = "".join(
-        f'<option value="{esc(x)}" {"selected" if x == st.session_state.get("ff_type","Films") else ""}>{esc(x)}</option>'
-        for x in type_options
+pill_label("Trier / filtrer")
+f1, f2, f3 = st.columns(3)
+with f1:
+    st.selectbox(
+        "Trier",
+        ["Pertinence", "Année (récent)", "Année (ancien)", "Note (haute)"],
+        key="sort_choice",
+        label_visibility="collapsed",
     )
-    sort_opts_html = "".join(
-        f'<option value="{esc(x)}" {"selected" if x == st.session_state.get("ff_sort","Pertinence") else ""}>{esc(x)}</option>'
-        for x in sort_options
+with f2:
+    st.selectbox(
+        "Plateforme",
+        platform_choices,
+        key="platform_choice",
+        label_visibility="collapsed",
     )
-    platform_opts_html = "".join(
-        f'<option value="{esc(x)}" {"selected" if x == st.session_state.get("ff_platform","Toutes") else ""}>{esc(x)}</option>'
-        for x in platform_choices
-    )
+with f3:
+    st.checkbox("Seulement mes applis", key="only_apps_choice")
 
-    radio_html = "".join(
-        f"""
-        <label class="ff-radio">
-            <input type="radio" name="ff_mode_local" value="{esc(x)}" {"checked" if x == st.session_state.get("ff_mode","Normal") else ""}>
-            <span>{esc(x)}</span>
-        </label>
-        """
-        for x in mode_options
-    )
-
-    return f"""
-    <!doctype html>
-    <html>
-    <head>
-      <meta charset="utf-8" />
-      <style>
-        html, body {{
-          margin: 0;
-          padding: 0;
-          background: transparent;
-          font-family: Arial, Helvetica, sans-serif;
-        }}
-
-        .wrap {{
-          padding: 4px 2px 8px 2px;
-        }}
-
-        .title {{
-          display: inline-block;
-          background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,244,244,0.96));
-          color: #111;
-          padding: 10px 14px;
-          border-radius: 14px;
-          font-size: 22px;
-          font-weight: 800;
-          border: 1px solid rgba(220,220,220,0.95);
-          box-shadow: 0 4px 10px rgba(0,0,0,0.12);
-          margin-bottom: 12px;
-        }}
-
-        .panel {{
-          position: relative;
-          border-radius: 22px;
-          overflow: hidden;
-          min-height: 260px;
-          box-shadow: 0 14px 30px rgba(0,0,0,0.22);
-          border: 1px solid rgba(255,255,255,0.35);
-          background-image:
-            linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.55)),
-            url("{theme_bg}");
-          background-size: cover;
-          background-position: center;
-        }}
-
-        .overlay {{
-          padding: 20px;
-          display: grid;
-          gap: 12px;
-        }}
-
-        .row2 {{
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 14px;
-        }}
-
-        .row3 {{
-          display: grid;
-          grid-template-columns: 1.2fr 1.2fr 0.8fr;
-          gap: 14px;
-        }}
-
-        .pill {{
-          display: inline-block;
-          padding: 5px 10px;
-          border-radius: 10px;
-          background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,244,244,0.96));
-          color: #111;
-          border: 1px solid rgba(220,220,220,0.95);
-          margin-bottom: 6px;
-          box-shadow: 0 3px 8px rgba(0,0,0,0.10);
-          font-size: 13px;
-          font-weight: 600;
-        }}
-
-        .fieldbox {{
-          background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,246,246,0.96));
-          border: 1px solid rgba(220,220,220,0.95);
-          border-radius: 16px;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.12);
-          padding: 10px;
-        }}
-
-        .select-clean {{
-          width: 100%;
-          border: none;
-          outline: none;
-          background: #fff;
-          border-radius: 12px;
-          padding: 12px 14px;
-          font-size: 15px;
-          color: #111;
-          box-sizing: border-box;
-          border: 1px solid rgba(220,220,220,0.95);
-        }}
-
-        .hintbox {{
-          background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,246,246,0.96));
-          border: 1px solid rgba(220,220,220,0.95);
-          border-radius: 14px;
-          padding: 10px 12px;
-          color: rgba(0,0,0,0.70);
-          font-size: 13px;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.10);
-        }}
-
-        .inputwrap {{
-          position: relative;
-        }}
-
-        .input-clean {{
-          width: 100%;
-          border: 1px solid rgba(220,220,220,0.95);
-          outline: none;
-          background: #fff;
-          border-radius: 14px;
-          padding: 13px 44px 13px 14px;
-          font-size: 15px;
-          color: #111;
-          box-sizing: border-box;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.10);
-        }}
-
-        .clear-btn {{
-          position: absolute;
-          right: 10px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 28px;
-          height: 28px;
-          border-radius: 9px;
-          border: 1px solid rgba(220,220,220,0.95);
-          background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,244,244,0.96));
-          color: #555;
-          font-size: 16px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }}
-
-        .modes {{
-          display: flex;
-          gap: 18px;
-          align-items: center;
-          flex-wrap: wrap;
-          padding: 10px 12px;
-          background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,246,246,0.96));
-          border: 1px solid rgba(220,220,220,0.95);
-          border-radius: 14px;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.10);
-        }}
-
-        .ff-radio {{
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 15px;
-          color: #111;
-          cursor: pointer;
-        }}
-
-        .actionbar {{
-          display: flex;
-          gap: 10px;
-          align-items: center;
-          flex-wrap: wrap;
-        }}
-
-        .search-btn {{
-          border: 1px solid rgba(220,220,220,0.95);
-          background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(242,242,242,0.96));
-          color: #111;
-          border-radius: 14px;
-          padding: 12px 18px;
-          font-size: 16px;
-          font-weight: 700;
-          cursor: pointer;
-          box-shadow: 0 6px 16px rgba(0,0,0,0.12);
-        }}
-
-        .only-apps {{
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,246,246,0.96));
-          border: 1px solid rgba(220,220,220,0.95);
-          border-radius: 14px;
-          padding: 12px 14px;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.10);
-          color: #111;
-          font-size: 14px;
-        }}
-
-        @media (max-width: 900px) {{
-          .row2, .row3 {{
-            grid-template-columns: 1fr;
-          }}
-        }}
-      </style>
-    </head>
-    <body>
-      <div class="wrap">
-        <div class="title">Recherche</div>
-
-        <div class="panel">
-          <div class="overlay">
-
-            <div class="row2">
-              <div>
-                <div class="pill">Je cherche</div>
-                <div class="fieldbox">
-                  <select id="ff_type_local" class="select-clean">{type_opts_html}</select>
-                </div>
-              </div>
-
-              <div>
-                <div class="pill">Mode</div>
-                <div class="modes">{radio_html}</div>
-              </div>
-            </div>
-
-            <div class="hintbox">Astuce • Acteur seul = OK • Clique acteur = films</div>
-
-            <div>
-              <div class="pill">Histoire / souvenir / titre exact</div>
-              <div class="inputwrap">
-                <input id="ff_story_local" class="input-clean" type="text"
-                  value="{current_story}"
-                  placeholder="Ex: Seul au monde ou un homme rescapé d'un crash avion sur une île déserte">
-                <button id="ff_story_clear" class="clear-btn" type="button">×</button>
-              </div>
-            </div>
-
-            <div>
-              <div class="pill">Acteur/actrice (optionnel)</div>
-              <div class="inputwrap">
-                <input id="ff_actor_local" class="input-clean" type="text"
-                  value="{current_actor}"
-                  placeholder="Ex: Tom Hanks">
-                <button id="ff_actor_clear" class="clear-btn" type="button">×</button>
-              </div>
-            </div>
-
-            <div class="actionbar">
-              <button id="ff_submit" class="search-btn" type="button">Chercher</button>
-            </div>
-
-            <div class="row3">
-              <div>
-                <div class="pill">Trier par</div>
-                <div class="fieldbox">
-                  <select id="ff_sort_local" class="select-clean">{sort_opts_html}</select>
-                </div>
-              </div>
-
-              <div>
-                <div class="pill">Plateforme</div>
-                <div class="fieldbox">
-                  <select id="ff_platform_local" class="select-clean">{platform_opts_html}</select>
-                </div>
-              </div>
-
-              <div>
-                <div class="pill">Filtre</div>
-                <label class="only-apps">
-                  <input id="ff_only_local" type="checkbox" {current_only}>
-                  <span>Seulement mes applis</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <script>
-        function setFrameHeight() {{
-          const h = Math.max(document.body.scrollHeight, 420);
-          parent.postMessage({{
-            isStreamlitMessage: true,
-            type: "streamlit:setFrameHeight",
-            height: h
-          }}, "*");
-        }}
-
-        function qParentInput(label) {{
-          return parent.document.querySelector('input[aria-label="' + label + '"]');
-        }}
-
-        function qParentButton(label) {{
-          const btns = Array.from(parent.document.querySelectorAll("button"));
-          return btns.find(b => (b.innerText || "").trim() === label);
-        }}
-
-        function reactSetValue(el, value) {{
-          if (!el) return;
-          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-          setter.call(el, value);
-          el.dispatchEvent(new Event("input", {{ bubbles: true }}));
-          el.dispatchEvent(new Event("change", {{ bubbles: true }}));
-        }}
-
-        function hideBridge() {{
-          const labels = [
-            "__ff_story__",
-            "__ff_actor__",
-            "__ff_type__",
-            "__ff_mode__",
-            "__ff_sort__",
-            "__ff_platform__",
-            "__ff_only_apps__"
-          ];
-
-          labels.forEach(label => {{
-            const input = qParentInput(label);
-            if (input) {{
-              const widget = input.closest('[data-testid="stTextInput"]') || input.closest('[data-testid="stWidget"]');
-              if (widget) widget.style.display = "none";
-            }}
-          }});
-
-          const btn = qParentButton("__ff_search__");
-          if (btn) {{
-            const wrap = btn.closest('[data-testid="stButton"]') || btn.parentElement;
-            if (wrap) wrap.style.display = "none";
-          }}
-        }}
-
-        function blurAll() {{
-          try {{
-            document.activeElement && document.activeElement.blur && document.activeElement.blur();
-            parent.document.activeElement && parent.document.activeElement.blur && parent.document.activeElement.blur();
-            parent.document.body && parent.document.body.focus && parent.document.body.focus();
-          }} catch(e) {{}}
-        }}
-
-        function submitSearch() {{
-          const story = document.getElementById("ff_story_local").value || "";
-          const actor = document.getElementById("ff_actor_local").value || "";
-          const type = document.getElementById("ff_type_local").value || "Films";
-          const mode = (document.querySelector('input[name="ff_mode_local"]:checked') || {{value:"Normal"}}).value;
-          const sort = document.getElementById("ff_sort_local").value || "Pertinence";
-          const platform = document.getElementById("ff_platform_local").value || "Toutes";
-          const onlyApps = document.getElementById("ff_only_local").checked ? "1" : "0";
-
-          reactSetValue(qParentInput("__ff_story__"), story);
-          reactSetValue(qParentInput("__ff_actor__"), actor);
-          reactSetValue(qParentInput("__ff_type__"), type);
-          reactSetValue(qParentInput("__ff_mode__"), mode);
-          reactSetValue(qParentInput("__ff_sort__"), sort);
-          reactSetValue(qParentInput("__ff_platform__"), platform);
-          reactSetValue(qParentInput("__ff_only_apps__"), onlyApps);
-
-          blurAll();
-
-          const btn = qParentButton("__ff_search__");
-          if (btn) btn.click();
-        }}
-
-        document.getElementById("ff_submit").addEventListener("click", submitSearch);
-
-        document.getElementById("ff_story_local").addEventListener("keydown", function(e) {{
-          if (e.key === "Enter") {{
-            e.preventDefault();
-            submitSearch();
-          }}
-        }});
-
-        document.getElementById("ff_actor_local").addEventListener("keydown", function(e) {{
-          if (e.key === "Enter") {{
-            e.preventDefault();
-            submitSearch();
-          }}
-        }});
-
-        document.getElementById("ff_story_clear").addEventListener("click", function() {{
-          document.getElementById("ff_story_local").value = "";
-          document.getElementById("ff_story_local").focus();
-        }});
-
-        document.getElementById("ff_actor_clear").addEventListener("click", function() {{
-          document.getElementById("ff_actor_local").value = "";
-          document.getElementById("ff_actor_local").focus();
-        }});
-
-        document.getElementById("ff_sort_local").addEventListener("change", submitSearch);
-        document.getElementById("ff_platform_local").addEventListener("change", submitSearch);
-        document.getElementById("ff_only_local").addEventListener("change", submitSearch);
-
-        setTimeout(() => {{
-          hideBridge();
-          setFrameHeight();
-        }}, 80);
-
-        setTimeout(() => {{
-          hideBridge();
-          setFrameHeight();
-        }}, 400);
-      </script>
-    </body>
-    </html>
-    """
-
-components.html(search_component_html(), height=460, scrolling=False)
-
-# =========================================================
-# SEARCH EXECUTION
-# =========================================================
-if search_clicked:
-    st.session_state["raw_items"] = build_raw_items(
-        st.session_state.get("ff_story", "").strip(),
-        st.session_state.get("ff_actor", "").strip(),
-        st.session_state.get("ff_mode", "Normal"),
-        profile,
-        showtype_to_list(st.session_state.get("ff_type", "Films")),
-    )
+if search_now or st.session_state.pop("auto_search", False):
+    do_search()
 
 raw_items = st.session_state.get("raw_items", [])
 
@@ -1773,16 +1413,67 @@ if not raw_items:
         '<div class="ff-panel ff-muted">Tape une histoire, un titre exact ou un acteur puis valide avec Entrée ou Chercher.</div>',
         unsafe_allow_html=True,
     )
+    components.html(
+        """
+        <script>
+        setTimeout(function(){
+          const root = parent.document;
+          const inputs = root.querySelectorAll('input[aria-label="Histoire / souvenir / titre exact"], input[aria-label="Acteur/actrice (optionnel)"]');
+          inputs.forEach(function(inp){
+            if (inp.dataset.ffBound === "1") return;
+            inp.dataset.ffBound = "1";
+            inp.addEventListener("keydown", function(e){
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const btns = Array.from(root.querySelectorAll("button"));
+                const btn = btns.find(b => (b.innerText || "").trim() === "Chercher");
+                if (btn) btn.click();
+              }
+            });
+          });
+        }, 120);
+        </script>
+        """,
+        height=0,
+        scrolling=False,
+    )
     st.stop()
 
 view = apply_filters_and_sort(
     raw_items,
-    st.session_state.get("ff_sort", "Pertinence"),
-    st.session_state.get("ff_only_apps", "0") == "1",
-    st.session_state.get("ff_platform", "Toutes"),
+    st.session_state.get("sort_choice", "Pertinence"),
+    st.session_state.get("only_apps_choice", False),
+    st.session_state.get("platform_choice", "Toutes"),
+    None,
 )
 
 st.markdown('<div id="ff-first-film-anchor"></div>', unsafe_allow_html=True)
+st.write(f"✅ Résultats : {min(len(view), 20)} / {len(view)}")
+
+components.html(
+    """
+    <script>
+    setTimeout(function(){
+      const root = parent.document;
+      const inputs = root.querySelectorAll('input[aria-label="Histoire / souvenir / titre exact"], input[aria-label="Acteur/actrice (optionnel)"]');
+      inputs.forEach(function(inp){
+        if (inp.dataset.ffBound === "1") return;
+        inp.dataset.ffBound = "1";
+        inp.addEventListener("keydown", function(e){
+          if (e.key === "Enter") {
+            e.preventDefault();
+            const btns = Array.from(root.querySelectorAll("button"));
+            const btn = btns.find(b => (b.innerText || "").trim() === "Chercher");
+            if (btn) btn.click();
+          }
+        });
+      });
+    }, 120);
+    </script>
+    """,
+    height=0,
+    scrolling=False,
+)
 
 if st.session_state.pop("scroll_to_results", False):
     components.html(
@@ -1809,9 +1500,23 @@ if st.session_state.pop("scroll_to_results", False):
         scrolling=False,
     )
 
-# =========================================================
-# RESULTS HTML CUSTOM
-# =========================================================
+restore_card_id = st.session_state.pop("restore_card_id", None)
+if restore_card_id:
+    components.html(
+        f"""
+        <script>
+        setTimeout(function(){{
+          const el = parent.document.getElementById("card-{restore_card_id}");
+          if (el) {{
+            el.scrollIntoView({{behavior:"auto", block:"start"}});
+          }}
+        }}, 70);
+        </script>
+        """,
+        height=0,
+        scrolling=False,
+    )
+
 allowed_ids = set(profile.get("platform_ids", []))
 
 
@@ -1823,361 +1528,109 @@ def details_fr_links(show_id: str):
     return dedupe_streaming_options(opts)
 
 
-def result_card_html(item):
+for item in view[:20]:
     show_id = str(item.get("api_id") or "")
-    title = esc(item["title"])
-    year = esc(item["year"] if item["year"] else "")
-    poster = esc(item.get("poster") or "")
-    overview = esc(item.get("overview") or "")
-    trailer_url = esc(trailer_direct_url(item["title"], item.get("year")))
+    card_id = stable_id(item.get("show") or {}) if item.get("show") else (show_id or item["title"])
 
-    stars = ""
-    if item.get("score100") is not None:
-        score5 = round(float(item["score100"]) / 20.0, 1)
-        stars = f"""
-        <div class="r-stars-line">
-          {stars_html(item["score100"])}
-          <span class="r-score">({esc(score5)}/5)</span>
-        </div>
-        """
+    st.markdown(f'<div id="card-{card_id}"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="ff-card">', unsafe_allow_html=True)
 
-    opts_all = item.get("opts_all") or []
-    if not opts_all and show_id:
-        opts_all = details_fr_links(show_id)
+    c_img, c_txt = st.columns([1, 3])
 
-    groups = group_options_by_service(opts_all)
-    mine = [g for g in groups if g["id"] in allowed_ids]
-    others = [g for g in groups if g["id"] not in allowed_ids]
+    with c_img:
+        if item.get("poster"):
+            st.image(item["poster"], width=160)
 
-    mine_html = ""
-    if mine:
-        mine_html += '<div class="r-small ok">✅ Dispo sur tes applis</div>'
-        mine_html += '<div class="r-block-title">Tes plateformes :</div>'
-        for g in mine:
-            primary, rest = pick_primary_option(g["opts"])
-            label = esc(g["name"])
-            typ = esc(primary["type"] if primary else "")
-            link = esc(primary["link"] if primary and primary.get("link") else "")
-            if link:
-                mine_html += f'<div class="r-link-line"><b>{label}</b> ({typ}) → <a href="{link}" target="_blank">{link}</a></div>'
-            else:
-                mine_html += f'<div class="r-link-line"><b>{label}</b> ({typ})</div>'
-
-            if rest:
-                mine_html += '<div class="r-sublist">'
-                for opt in rest:
-                    typ2 = esc(opt["type"])
-                    link2 = esc(opt["link"] or "")
-                    if link2:
-                        mine_html += f'<div>• ({typ2}) → <a href="{link2}" target="_blank">{link2}</a></div>'
-                    else:
-                        mine_html += f'<div>• ({typ2})</div>'
-                mine_html += '</div>'
-    else:
-        mine_html += '<div class="r-small no">❌ Pas dispo sur tes applis</div>'
-
-    others_html = ""
-    if others:
-        others_html += '<div class="r-block-title">Autres plateformes :</div>'
-        for g in others:
-            primary, rest = pick_primary_option(g["opts"])
-            label = esc(g["name"])
-            typ = esc(primary["type"] if primary else "")
-            link = esc(primary["link"] if primary and primary.get("link") else "")
-            if link:
-                others_html += f'<div class="r-link-line"><b>{label}</b> ({typ}) → <a href="{link}" target="_blank">{link}</a></div>'
-            else:
-                others_html += f'<div class="r-link-line"><b>{label}</b> ({typ})</div>'
-            if rest:
-                others_html += '<div class="r-sublist">'
-                for opt in rest:
-                    typ2 = esc(opt["type"])
-                    link2 = esc(opt["link"] or "")
-                    if link2:
-                        others_html += f'<div>• ({typ2}) → <a href="{link2}" target="_blank">{link2}</a></div>'
-                    else:
-                        others_html += f'<div>• ({typ2})</div>'
-                others_html += '</div>'
-
-    cast = item.get("cast") or []
-    actors_html = ""
-    if cast:
-        actor_links = []
-        for actor in cast[:12]:
-            actor_safe = esc(actor)
-            actor_js = actor.replace("\\", "\\\\").replace("'", "\\'")
-            actor_links.append(
-                f'<a href="javascript:void(0)" class="r-actor" onclick="searchActor(\'{actor_js}\')">{actor_safe}</a>'
+        trailer_url = trailer_direct_url(item["title"], item.get("year"))
+        if trailer_url:
+            st.markdown(
+                f'<a class="ff-linkbox" href="{esc(trailer_url)}" target="_blank">Bande-annonce</a>',
+                unsafe_allow_html=True,
             )
-        actors_html = '<div class="r-actors"><b>Acteurs :</b> ' + " ".join(actor_links) + "</div>"
 
-    trailer_html = ""
-    if trailer_url:
-        trailer_html = f'<a class="r-pilllink" href="{trailer_url}" target="_blank">Bande-annonce</a>'
+    with c_txt:
+        title = esc(item["title"])
+        year = esc(item["year"] if item["year"] else "")
+        st.markdown(f"### {title} {f'({year})' if year else ''}", unsafe_allow_html=True)
 
-    card_id = esc(stable_id(item["show"]))
-    return f"""
-    <div class="result-card" id="card-{card_id}">
-      <div class="result-grid">
-        <div class="result-left">
-          {'<img class="poster" src="' + poster + '" alt="poster">' if poster else ''}
-          {trailer_html}
-        </div>
+        if item.get("score100") is not None:
+            score5 = round(float(item["score100"]) / 20.0, 1)
+            st.markdown(
+                f"{stars_html(item['score100'])}<span style='margin-left:8px;color:rgba(0,0,0,0.72);font-size:14px;'>({esc(score5)}/5)</span>",
+                unsafe_allow_html=True,
+            )
 
-        <div class="result-right">
-          <div class="result-title">{title} {f'({year})' if year else ''}</div>
-          {stars}
-          {mine_html}
+        opts_all = item.get("opts_all") or []
+        if not opts_all and show_id:
+            opts_all = details_fr_links(show_id)
 
-          <button class="detail-btn" type="button" onclick="toggleDetails('{card_id}')">Détails</button>
+        groups = group_options_by_service(opts_all)
+        mine = [g for g in groups if g["id"] in allowed_ids]
+        others = [g for g in groups if g["id"] not in allowed_ids]
 
-          <div class="detail-box" id="detail-{card_id}">
-            {'<div class="r-overview">' + overview + '</div>' if overview else ''}
-            {actors_html}
-            {others_html}
-          </div>
-        </div>
-      </div>
-    </div>
-    """
+        if mine:
+            st.markdown("<div style='font-size:14px;color:rgba(0,0,0,0.72);margin-bottom:8px;'>✅ Dispo sur tes applis</div>", unsafe_allow_html=True)
+            st.markdown("**Tes plateformes :**")
+            for g in mine:
+                primary, rest = pick_primary_option(g["opts"])
+                label = esc(g["name"])
+                typ = esc(primary["type"] if primary else "")
+                link = esc(primary["link"] if primary and primary.get("link") else "")
+                if link:
+                    st.markdown(f"**{label}** ({typ}) → <a href='{link}' target='_blank'>{link}</a>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"**{label}** ({typ})", unsafe_allow_html=True)
 
+                if rest:
+                    with st.expander(f"… autres options sur {g['name']}"):
+                        for opt in rest:
+                            typ2 = esc(opt["type"])
+                            link2 = esc(opt["link"] or "")
+                            if link2:
+                                st.markdown(f"- ({typ2}) → <a href='{link2}' target='_blank'>{link2}</a>", unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"- ({typ2})", unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='font-size:14px;color:rgba(0,0,0,0.72);margin-bottom:8px;'>❌ Pas dispo sur tes applis</div>", unsafe_allow_html=True)
 
-cards_html = "".join(result_card_html(x) for x in view[:20])
+        if st.button("Détails", key=f"details_btn_{card_id}"):
+            st.session_state["open_details_id"] = (
+                card_id if st.session_state["open_details_id"] != card_id else None
+            )
+            st.session_state["restore_card_id"] = card_id
+            st.rerun()
 
-results_html = f"""
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <style>
-    html, body {{
-      margin:0;
-      padding:0;
-      background: transparent;
-      font-family: Arial, Helvetica, sans-serif;
-      color:#111;
-    }}
+        if st.session_state.get("open_details_id") == card_id:
+            if item.get("overview"):
+                st.markdown(f"<div style='margin-top:10px;margin-bottom:10px;line-height:1.5;'>{esc(item['overview'])}</div>", unsafe_allow_html=True)
 
-    .results-wrap {{
-      padding: 6px 2px 20px 2px;
-    }}
+            cast = item.get("cast") or []
+            if cast:
+                actor_links = []
+                for actor in cast[:12]:
+                    actor_links.append(f'<a class="ff-linkbox" href="?actor={quote(actor)}">{esc(actor)}</a>')
+                st.markdown("**Acteurs :** " + " ".join(actor_links), unsafe_allow_html=True)
 
-    .count-box {{
-      display:inline-block;
-      margin-bottom:10px;
-      padding:10px 14px;
-      border-radius:14px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95));
-      border:1px solid rgba(220,220,220,0.95);
-      box-shadow:0 6px 18px rgba(0,0,0,0.12);
-      font-weight:700;
-    }}
+            if others:
+                st.markdown("**Autres plateformes :**")
+                for g in others:
+                    primary, rest = pick_primary_option(g["opts"])
+                    label = esc(g["name"])
+                    typ = esc(primary["type"] if primary else "")
+                    link = esc(primary["link"] if primary and primary.get("link") else "")
+                    if link:
+                        st.markdown(f"**{label}** ({typ}) → <a href='{link}' target='_blank'>{link}</a>", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"**{label}** ({typ})", unsafe_allow_html=True)
 
-    .result-card {{
-      border:1px solid rgba(220,220,220,0.95);
-      background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(248,248,248,0.95));
-      border-radius:18px;
-      padding:14px;
-      margin: 10px 0;
-      box-shadow:0 12px 22px rgba(0,0,0,0.14);
-    }}
+                    if rest:
+                        with st.expander(f"… autres options sur {g['name']}", expanded=False):
+                            for opt in rest:
+                                typ2 = esc(opt["type"])
+                                link2 = esc(opt["link"] or "")
+                                if link2:
+                                    st.markdown(f"- ({typ2}) → <a href='{link2}' target='_blank'>{link2}</a>", unsafe_allow_html=True)
+                                else:
+                                    st.markdown(f"- ({typ2})", unsafe_allow_html=True)
 
-    .result-grid {{
-      display:grid;
-      grid-template-columns: 180px 1fr;
-      gap:18px;
-    }}
-
-    .poster {{
-      width:160px;
-      max-width:100%;
-      border-radius:14px;
-      display:block;
-      box-shadow:0 6px 16px rgba(0,0,0,0.20);
-    }}
-
-    .result-title {{
-      font-size: 34px;
-      line-height: 1.08;
-      font-weight: 800;
-      margin-bottom: 10px;
-      color:#111;
-    }}
-
-    .r-stars-line {{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      margin-bottom: 10px;
-      font-size: 16px;
-    }}
-
-    .r-score {{
-      color: rgba(0,0,0,0.72);
-      font-size: 14px;
-    }}
-
-    .r-small {{
-      margin-bottom: 8px;
-      font-size: 14px;
-    }}
-
-    .r-block-title {{
-      font-weight: 700;
-      margin: 8px 0 6px 0;
-    }}
-
-    .r-link-line {{
-      margin: 4px 0;
-      word-break: break-word;
-    }}
-
-    .r-link-line a {{
-      color:#0b57d0;
-      text-decoration:none;
-    }}
-
-    .r-sublist {{
-      margin:4px 0 8px 14px;
-      color:#333;
-      font-size:13px;
-    }}
-
-    .r-pilllink {{
-      display:inline-block;
-      margin-top:10px;
-      padding:8px 10px;
-      border-radius:12px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,244,244,0.96));
-      border:1px solid rgba(220,220,220,0.95);
-      color:#111;
-      text-decoration:none;
-      font-weight:600;
-      box-shadow:0 4px 10px rgba(0,0,0,0.10);
-    }}
-
-    .detail-btn {{
-      margin-top:12px;
-      padding:11px 14px;
-      border-radius:12px;
-      border:1px solid rgba(220,220,220,0.95);
-      background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(242,242,242,0.96));
-      color:#111;
-      cursor:pointer;
-      font-weight:700;
-      box-shadow:0 4px 10px rgba(0,0,0,0.10);
-    }}
-
-    .detail-box {{
-      display:none;
-      margin-top:12px;
-      padding:12px;
-      border-radius:14px;
-      border:1px solid rgba(220,220,220,0.95);
-      background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(246,246,246,0.96));
-    }}
-
-    .detail-box.open {{
-      display:block;
-    }}
-
-    .r-overview {{
-      margin-bottom: 10px;
-      line-height: 1.5;
-    }}
-
-    .r-actors {{
-      line-height:1.7;
-      margin-bottom:10px;
-    }}
-
-    .r-actor {{
-      display:inline-block;
-      padding: 3px 7px;
-      border-radius: 9px;
-      background: rgba(255,255,255,0.98);
-      border:1px solid rgba(220,220,220,0.95);
-      color:#0b57d0;
-      text-decoration:none;
-      margin:2px 4px 2px 0;
-    }}
-
-    @media (max-width: 860px) {{
-      .result-grid {{
-        grid-template-columns: 1fr;
-      }}
-      .result-left {{
-        text-align:left;
-      }}
-      .result-title {{
-        font-size: 24px;
-      }}
-    }}
-  </style>
-</head>
-<body>
-  <div class="results-wrap">
-    <div class="count-box">✅ Résultats : {min(len(view), 20)} / {len(view)}</div>
-    {cards_html}
-  </div>
-
-  <script>
-    function setFrameHeight() {{
-      const h = Math.max(document.body.scrollHeight, 500);
-      parent.postMessage({{
-        isStreamlitMessage: true,
-        type: "streamlit:setFrameHeight",
-        height: h
-      }}, "*");
-    }}
-
-    function qParentInput(label) {{
-      return parent.document.querySelector('input[aria-label="' + label + '"]');
-    }}
-
-    function qParentButton(label) {{
-      const btns = Array.from(parent.document.querySelectorAll("button"));
-      return btns.find(b => (b.innerText || "").trim() === label);
-    }}
-
-    function reactSetValue(el, value) {{
-      if (!el) return;
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-      setter.call(el, value);
-      el.dispatchEvent(new Event("input", {{ bubbles: true }}));
-      el.dispatchEvent(new Event("change", {{ bubbles: true }}));
-    }}
-
-    function searchActor(actorName) {{
-      reactSetValue(qParentInput("__ff_actor__"), actorName);
-      reactSetValue(qParentInput("__ff_story__"), "");
-      reactSetValue(qParentInput("__ff_type__"), "Films");
-      reactSetValue(qParentInput("__ff_mode__"), "Normal");
-      const btn = qParentButton("__ff_search__");
-      if (btn) btn.click();
-    }}
-
-    function toggleDetails(id) {{
-      const all = Array.from(document.querySelectorAll(".detail-box"));
-      all.forEach(el => {{
-        if (el.id !== "detail-" + id) {{
-          el.classList.remove("open");
-        }}
-      }});
-
-      const target = document.getElementById("detail-" + id);
-      if (target) {{
-        target.classList.toggle("open");
-      }}
-
-      setTimeout(setFrameHeight, 80);
-    }}
-
-    setTimeout(setFrameHeight, 80);
-    setTimeout(setFrameHeight, 400);
-  </script>
-</body>
-</html>
-"""
-
-components.html(results_html, height=800, scrolling=False)
+    st.markdown("</div>", unsafe_allow_html=True)
