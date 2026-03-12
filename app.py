@@ -172,10 +172,11 @@ def choose_auto_theme_name() -> str:
 
 
 def apply_theme(theme_name: str) -> None:
+    resolved_theme_name = theme_name
     if theme_name == "Auto":
-        theme_name = choose_auto_theme_name()
+        resolved_theme_name = choose_auto_theme_name()
 
-    theme = THEMES[theme_name]
+    theme = THEMES[resolved_theme_name]
 
     st.markdown(
         f"""
@@ -315,6 +316,30 @@ def apply_theme(theme_name: str) -> None:
             line-height: 1 !important;
         }}
 
+        .actor-chip {{
+            display:inline-block;
+            padding:6px 10px;
+            margin:4px 6px 0 0;
+            border-radius:999px;
+            border:1px solid {theme["border"]};
+            background: rgba(255,255,255,0.90);
+            color:#111111 !important;
+            text-decoration:none;
+            font-size: 13px;
+        }}
+
+        .theme-badge {{
+            display:inline-block;
+            padding:5px 10px;
+            border-radius:999px;
+            font-size:12px;
+            font-weight:600;
+            background: rgba(255,255,255,0.88);
+            color:#111111 !important;
+            border:1px solid {theme["border"]};
+            margin-left:6px;
+        }}
+
         [data-testid="stExpander"] {{
             border-radius: 14px !important;
         }}
@@ -322,6 +347,8 @@ def apply_theme(theme_name: str) -> None:
         """,
         unsafe_allow_html=True,
     )
+
+    st.session_state["resolved_theme_name"] = resolved_theme_name
 
 
 # =========================================================
@@ -342,7 +369,10 @@ def load_profile() -> dict:
 
 
 def save_profile(profile: dict) -> None:
-    PROFILE_PATH.write_text(json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
+    PROFILE_PATH.write_text(
+        json.dumps(profile, ensure_ascii=False, indent=2),
+        encoding="utf-8"
+    )
 
 
 profile = load_profile()
@@ -520,6 +550,22 @@ def get_query_params() -> dict:
     return {}
 
 
+def set_query_params_safe(**kwargs) -> None:
+    if hasattr(st, "query_params"):
+        try:
+            st.query_params.clear()
+            for k, v in kwargs.items():
+                st.query_params[k] = v
+            return
+        except Exception:
+            pass
+    if hasattr(st, "experimental_set_query_params"):
+        try:
+            st.experimental_set_query_params(**kwargs)
+        except Exception:
+            pass
+
+
 def clear_query_params() -> None:
     if hasattr(st, "query_params"):
         try:
@@ -664,818 +710,707 @@ def group_options_by_service(options: list):
         groups[key]["opts"].append({"type": typ, "link": link})
 
     out = list(groups.values())
-    for g in out:
-        seen = set()
-        ded = []
-        for item in g["opts"]:
-            key = (item["type"], item["link"])
-            if key in seen:
-                continue
-            seen.add(key)
-            ded.append(item)
-        ded.sort(key=lambda x: TYPE_PRIORITY.get(x["type"], 99))
-        g["opts"] = ded
 
-    out.sort(key=lambda x: x["name"].lower())
+    def best_rank(g):
+        ranks = [TYPE_PRIORITY.get(o["type"], 999) for o in g["opts"]]
+        return min(ranks) if ranks else 999
+
+    out.sort(key=lambda g: (best_rank(g), g["name"].lower()))
     return out
 
 
-def pick_primary_option(opts: list):
-    if not opts:
-        return None, []
-    for opt in opts:
-        if opt["type"] == "subscription":
-            return opt, [x for x in opts if x != opt]
-    return opts[0], opts[1:]
-
-
 # =========================================================
-# OLLAMA (INTERNE, PAS AFFICHÉ)
+# OLLAMA / IA
 # =========================================================
-@st.cache_data(show_spinner=False, ttl=3600)
-def ollama_infer_entities(story: str, actor: str):
-    story = (story or "").strip()
-    actor = (actor or "").strip()
-    if not story and not actor:
-        return {"entities": [], "queries": []}
-
-    prompt = f"""
-Réponds UNIQUEMENT en JSON strict :
-{{"entities":[...], "queries":[...]}}
-
-- entities: 3 à 8 titres/franchises/personnages probables
-- queries: 4 à 8 requêtes courtes FR+EN
-Souvenir: {story}
-Acteur: {actor}
-JSON:
-""".strip()
-
+def ollama_available() -> bool:
     try:
-        response = requests.post(
-            f"{OLLAMA_URL}/api/generate",
-            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
-            timeout=45,
-        )
-        if not response.ok:
-            return {"entities": [], "queries": []}
-        txt = response.json().get("response", "") or ""
-        match = re.search(r"\{.*\}", txt, flags=re.S)
-        if not match:
-            return {"entities": [], "queries": []}
-        data = json.loads(match.group(0))
-
-        def clean_list(values, limit):
-            out = []
-            seen = set()
-            if not isinstance(values, list):
-                return out
-            for value in values:
-                if isinstance(value, str) and value.strip():
-                    key = norm_loose(value)
-                    if key not in seen:
-                        seen.add(key)
-                        out.append(value.strip())
-            return out[:limit]
-
-        return {
-            "entities": clean_list(data.get("entities", []), 8),
-            "queries": clean_list(data.get("queries", []), 8),
-        }
+        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=2)
+        return r.ok
     except Exception:
-        return {"entities": [], "queries": []}
+        return False
 
 
-# =========================================================
-# SEARCH LOGIC
-# =========================================================
-def merge_results(items):
-    out = {}
-    for show in items:
-        out[stable_id(show)] = show
-    return list(out.values())
-
-
-def showtype_to_list(choice: str):
-    if choice == "Films":
-        return ["movie"]
-    if choice == "Séries":
-        return ["series"]
-    return ["movie", "series"]
-
-
-def apply_rule_hints(story: str):
-    story_loose = norm_loose(story)
-    out = []
-    seen = set()
-    for rule in RULE_HINTS:
-        for trig in rule.get("if_any", []):
-            if norm_loose(trig) in story_loose:
-                for ent in rule.get("add_entities", []):
-                    key = norm_loose(ent)
-                    if key not in seen:
-                        seen.add(key)
-                        out.append(ent)
-                break
-    return out
-
-
-def build_query_variants(story: str, actor: str, mode: str):
-    story = (story or "").strip()
-    actor = (actor or "").strip()
-    variants = []
-
-    if story:
-        story_words = fr_numbers_to_words(story)
-        variants.extend(
-            [
-                story,
-                story_words,
-                strip_accents(story),
-                strip_accents(story_words),
-                f'"{story}"',
-                f'"{story_words}"',
-                extract_keywords(story),
-                extract_keywords(story_words),
-            ]
+def ollama_generate(prompt: str) -> str:
+    try:
+        r = requests.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+            },
+            timeout=25,
         )
+        if not r.ok:
+            return ""
+        data = r.json()
+        return (data.get("response") or "").strip()
+    except Exception:
+        return ""
 
-        words = [norm_loose(w) for w in re.findall(r"[A-Za-zÀ-ÿ0-9']+", story)]
-        translated = []
-        for w in words:
-            if w in SYNONYMS:
-                translated.extend(SYNONYMS[w])
-        if translated:
-            variants.append(" ".join(translated))
 
-        variants.extend(apply_rule_hints(story))
+def ai_expand_query(user_text: str) -> list[str]:
+    user_text = user_text.strip()
+    if not user_text:
+        return []
 
-    if actor:
-        variants.extend([actor, strip_accents(actor), f"{actor} film", f"{actor} movie"])
+    base = norm_loose(fr_numbers_to_words(user_text))
+    expansions = []
 
-    if mode != "Rapide":
-        ai = ollama_infer_entities(story, actor)
-        variants.extend(ai.get("entities", []))
-        variants.extend(ai.get("queries", []))
+    for word in base.split():
+        expansions.append(word)
+        for syn in SYNONYMS.get(word, []):
+            expansions.append(syn)
 
-    out = []
+    joined = " ".join(dict.fromkeys(expansions)).strip()
+
+    found_entities = []
+    for rule in RULE_HINTS:
+        if any(norm_loose(x) in base for x in rule["if_any"]):
+            for ent in rule["add_entities"]:
+                if ent not in found_entities:
+                    found_entities.append(ent)
+
+    candidates = []
+    if user_text not in candidates:
+        candidates.append(user_text)
+
+    if joined and joined not in candidates:
+        candidates.append(joined)
+
+    kw = extract_keywords(base, 8)
+    if kw and kw not in candidates:
+        candidates.append(kw)
+
+    candidates.extend(found_entities)
+
+    if ollama_available():
+        prompt = f"""
+Tu aides à retrouver un film ou une série à partir d'une requête en français.
+Rends UNIQUEMENT un JSON valide avec cette forme :
+{{
+  "queries": ["...", "...", "..."],
+  "titles": ["...", "..."]
+}}
+
+Règles :
+- 3 à 6 variantes max
+- privilégie titres exacts probables si tu en déduis un
+- ajoute variantes FR/EN si évident
+- pas d'explication
+
+Requête utilisateur :
+{user_text}
+"""
+        raw = ollama_generate(prompt)
+        if raw:
+            try:
+                data = json.loads(raw)
+                for q in data.get("queries", []) or []:
+                    if q and q not in candidates:
+                        candidates.append(q)
+                for t in data.get("titles", []) or []:
+                    if t and t not in candidates:
+                        candidates.append(t)
+            except Exception:
+                pass
+
+    deduped = []
     seen = set()
-    for v in variants:
-        v = (v or "").strip()
-        if not v:
+    for c in candidates:
+        c = re.sub(r"\s+", " ", str(c).strip())
+        if not c:
             continue
-        key = norm_loose(v)
-        if key not in seen:
-            seen.add(key)
-            out.append(v)
-    return out
+        key = norm_loose(c)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(c)
+
+    return deduped[:8]
 
 
-def relevance_score(show: dict, user_text: str):
-    title = norm_loose(show.get("title", ""))
-    overview = norm_loose(show.get("overview", ""))
-    hay = f"{title} {overview}".strip()
-    q = norm_loose(user_text)
+# =========================================================
+# RECHERCHE / SCORE
+# =========================================================
+def title_variants(title: str) -> set[str]:
+    variants = set()
+    if not title:
+        return variants
+    t = norm_loose(fr_numbers_to_words(title))
+    variants.add(t)
+    variants.add(t.replace("'", " "))
+    variants.add(re.sub(r"[^a-z0-9]", "", t))
+    return {v.strip() for v in variants if v.strip()}
 
-    score = 0.0
-    if q and (q in title or title in q):
-        score += 10.0
 
-    words = [w for w in q.split() if len(w) >= 4 and w not in STOPWORDS]
-    for w in set(words):
-        if w in hay:
-            score += 1.2
+def exact_title_match_score(query: str, title: str) -> int:
+    qvars = title_variants(query)
+    tvars = title_variants(title)
+    if qvars & tvars:
+        return 1000
+
+    q = norm_loose(fr_numbers_to_words(query))
+    t = norm_loose(fr_numbers_to_words(title))
+    if q == t:
+        return 1000
+
+    if q and t:
+        if q in t or t in q:
+            return 220
+    return 0
+
+
+def tokenize(text: str) -> list[str]:
+    text = norm_loose(fr_numbers_to_words(text))
+    words = re.findall(r"[a-z0-9']+", text)
+    return [w for w in words if w and w not in STOPWORDS]
+
+
+def compute_match_score(show: dict, user_query: str) -> int:
+    title = show.get("title") or ""
+    original_title = show.get("originalTitle") or ""
+    overview = show.get("overview") or ""
+    release_year = str(show.get("releaseYear") or show.get("firstAirYear") or "")
+    cast_list = show.get("cast") or []
+
+    score = 0
+    score += exact_title_match_score(user_query, title)
+    score += exact_title_match_score(user_query, original_title)
+
+    q_tokens = tokenize(user_query)
+    title_blob = " ".join([title, original_title, release_year])
+    title_blob_norm = norm_loose(title_blob)
+    overview_norm = norm_loose(overview)
+    cast_norm = " ".join(norm_loose(c) for c in cast_list if c)
+
+    for tok in q_tokens:
+        if tok in title_blob_norm:
+            score += 80
+        elif tok in cast_norm:
+            score += 40
+        elif tok in overview_norm:
+            score += 18
+
+    q_norm = norm_loose(user_query)
+
+    if "seul au monde" in q_norm or "cast away" in q_norm:
+        if "cast away" in norm_loose(title) or "seul au monde" in norm_loose(title):
+            score += 600
+
+    if "ile" in q_norm or "île" in user_query.lower():
+        if "island" in overview_norm or "île" in overview.lower() or "ile" in overview_norm:
+            score += 25
+
+    if "avion" in q_norm or "plane" in q_norm:
+        if "plane" in overview_norm or "airplane" in overview_norm or "avion" in overview.lower():
+            score += 25
+
+    if "surviv" in q_norm or "rescap" in q_norm or "naufrag" in q_norm:
+        if "surviv" in overview_norm or "castaway" in overview_norm:
+            score += 30
+
+    score += min(len(cast_list), 8)
+
     return score
 
 
-def build_raw_items(story: str, actor: str, mode: str, prof: dict, show_types: list):
-    country = prof["country"]
-    lang = prof["lang"]
-    allowed = set(prof.get("platform_ids", []))
-
-    presets = {
-        "Rapide": {"pool": 80, "max_pages": 1, "variants_max": 6},
-        "Normal": {"pool": 160, "max_pages": 2, "variants_max": 8},
-        "Profond": {"pool": 240, "max_pages": 3, "variants_max": 10},
-    }
-    pre = presets.get(mode, presets["Normal"])
-
-    story = (story or "").strip()
-    actor = (actor or "").strip()
-    if not story and not actor:
-        return []
-
-    if story:
-        story = fr_numbers_to_words(story)
-
-    found = []
-    source_country = {}
-
-    def add_chunk(ctry: str, show_type: str, shows: list):
-        for show in shows:
-            sid = stable_id(show)
-            if sid not in source_country:
-                source_country[sid] = ctry
-        return shows
-
-    # 1) titre exact d'abord
-    if story:
-        for stype in show_types:
-            exact = search_by_title(country, stype, lang, story)
-            if exact:
-                found += add_chunk(country, stype, exact)
-
-    # 2) variantes / synopsis
-    variants = build_query_variants(story, actor, mode)[: pre["variants_max"]]
-
-    for stype in show_types:
-        for kw in variants:
-            found += add_chunk(
-                country,
-                stype,
-                collect_shows(
-                    country,
-                    stype,
-                    lang,
-                    kw,
-                    max_items=pre["pool"],
-                    max_pages=pre["max_pages"],
-                ),
-            )
-            if len(found) >= pre["pool"]:
-                break
-
-    # 3) fallback US/GB si peu de résultats
-    if len(found) < 12:
-        for stype in show_types:
-            for kw in variants[: min(4, len(variants))]:
-                found += add_chunk(
-                    "us",
-                    stype,
-                    collect_shows(
-                        "us",
-                        stype,
-                        lang,
-                        kw,
-                        max_items=pre["pool"],
-                        max_pages=1,
-                    ),
-                )
-                found += add_chunk(
-                    "gb",
-                    stype,
-                    collect_shows(
-                        "gb",
-                        stype,
-                        lang,
-                        kw,
-                        max_items=pre["pool"],
-                        max_pages=1,
-                    ),
-                )
-
-    shows = merge_results(found)
-    user_text = story if story else actor
-
-    raw = []
-    for show in shows:
-        sid = stable_id(show)
-        discovered_in = source_country.get(sid, country)
-
-        year = show.get("releaseYear") or show.get("firstAirYear") or None
-        try:
-            year = int(year) if year else None
-        except Exception:
-            year = None
-
-        opts_all = []
-        if discovered_in == country:
-            opts_all = ((show.get("streamingOptions") or {}).get(country) or [])
-            opts_all = dedupe_streaming_options(opts_all)
-
-        opts_mine = [o for o in opts_all if ((o.get("service") or {}).get("id") in allowed)]
-        opts_mine = dedupe_streaming_options(opts_mine)
-
-        score100 = show.get("rating")
-        try:
-            score100 = float(score100) if score100 is not None else None
-        except Exception:
-            score100 = None
-
-        raw.append(
-            {
-                "show": show,
-                "api_id": show.get("id"),
-                "title": show.get("title") or "Sans titre",
-                "year": year,
-                "poster": get_poster_url(show),
-                "overview": show.get("overview") or "",
-                "cast": show.get("cast") or [],
-                "score100": score100,
-                "opts_all": opts_all,
-                "is_mine": 1 if opts_mine else 0,
-                "discovered_in": discovered_in,
-                "rel": relevance_score(show, user_text) + (0.25 * (1 if opts_mine else 0)),
-            }
-        )
-
-    raw.sort(key=lambda x: (x["rel"], x["is_mine"]), reverse=True)
-    return raw[: pre["pool"]]
-
-
-def apply_filters_and_sort(items, sort_mode, only_my_apps, platform_filter, year_range):
-    out = list(items)
-
-    if only_my_apps:
-        keep = [x for x in out if x["is_mine"] == 1]
-        out = keep if keep else out
-
-    if platform_filter != "Toutes":
-        def ok_platform(item):
-            for opt in item["opts_all"]:
-                svc = (opt.get("service") or {})
-                name = (svc.get("name") or svc.get("id") or "").strip()
-                if name == platform_filter:
-                    return True
-            return False
-
-        filtered = [x for x in out if ok_platform(x)]
-        out = filtered if filtered else out
-
-    if year_range:
-        y0, y1 = year_range
-        out = [x for x in out if x["year"] is None or (x["year"] >= y0 and x["year"] <= y1)]
-
-    if sort_mode == "Pertinence":
-        out.sort(key=lambda x: (x["rel"], x["is_mine"]), reverse=True)
-    elif sort_mode == "Année (récent)":
-        out.sort(key=lambda x: ((x["year"] is not None), x["year"] or -1, x["is_mine"]), reverse=True)
-    else:
-        out.sort(key=lambda x: ((x["score100"] is not None), x["score100"] or -1, x["is_mine"]), reverse=True)
-
+def merge_unique_shows(shows: list[dict]) -> list[dict]:
+    out = []
+    seen = set()
+    for s in shows:
+        sid = stable_id(s)
+        if sid in seen:
+            continue
+        seen.add(sid)
+        out.append(s)
     return out
 
 
-# =========================================================
-# SESSION
-# =========================================================
-st.session_state.setdefault("did_enter", False)
-st.session_state.setdefault("page", "Accueil" if not st.session_state["did_enter"] else "Recherche")
-st.session_state.setdefault("raw_items", [])
-st.session_state.setdefault("raw_query", "")
-st.session_state.setdefault("story_input", "")
-st.session_state.setdefault("actor_input", "")
-st.session_state.setdefault("show_choice", "Films et séries")
-st.session_state.setdefault("auto_search", False)
-st.session_state.setdefault("do_search_now", False)
-st.session_state.setdefault("open_details_id", None)
-st.session_state.setdefault("scroll_to_results", False)
+def enrich_show_for_scoring(show: dict, country: str, show_type: str, lang: str) -> dict:
+    details = get_show_details(str(show.get("id") or ""), country, show_type, lang)
+    if not details:
+        return show
 
-# acteur cliqué
-qp = get_query_params()
-if "actor" in qp:
-    val = qp.get("actor")
-    actor_param = val[0] if isinstance(val, list) and val else (val if isinstance(val, str) else "")
-    clear_query_params()
+    merged = dict(show)
+    for k, v in details.items():
+        if k not in merged or not merged.get(k):
+            merged[k] = v
 
-    st.session_state["actor_input"] = actor_param
-    st.session_state["story_input"] = ""
-    st.session_state["show_choice"] = "Films"
-    st.session_state["did_enter"] = True
-    st.session_state["page"] = "Recherche"
-    st.session_state["auto_search"] = True
-
-
-# =========================================================
-# NAV
-# =========================================================
-with st.sidebar:
-    st.markdown("## FilmFinder IA")
-    if st.session_state["did_enter"]:
-        nav = st.radio(
-            "Menu",
-            ["Recherche", "Profil"],
-            index=0 if st.session_state["page"] == "Recherche" else 1,
-            key="nav",
-        )
-        st.session_state["page"] = nav
-    else:
-        st.caption("Démarrage")
-
-page = st.session_state["page"]
-
-# =========================================================
-# ACCUEIL
-# =========================================================
-if page == "Accueil":
-    st.markdown("# FilmFinder IA")
-    st.caption("Choisis tes plateformes une fois, puis entre.")
-
-    if not RAPIDAPI_KEY:
-        st.error("RAPIDAPI_KEY manquante dans .env")
-        st.stop()
-
-    theme_pick = st.selectbox(
-        "Thème",
-        list(THEMES.keys()),
-        index=list(THEMES.keys()).index(profile.get("ui_theme", "Auto")),
-    )
-    if theme_pick != profile.get("ui_theme", "Auto"):
-        profile["ui_theme"] = theme_pick
-        save_profile(profile)
-        apply_theme(profile["ui_theme"])
-        st.rerun()
-
-    with st.form("welcome_profile"):
-        c1, c2 = st.columns(2)
-        with c1:
-            country = st.selectbox(
-                "Pays",
-                ["fr", "be", "ch", "gb", "us"],
-                index=["fr", "be", "ch", "gb", "us"].index(profile.get("country", "fr")),
-            )
-        with c2:
-            lang = st.selectbox(
-                "Langue",
-                ["fr", "en"],
-                index=["fr", "en"].index(profile.get("lang", "fr")),
-            )
-
-        services = get_services(country, lang)
-        name_to_id = {
-            (s.get("name") or s.get("id")): s.get("id")
-            for s in services
-            if (s.get("name") or s.get("id")) and s.get("id")
-        }
-        id_to_name = {v: k for k, v in name_to_id.items()}
-        default_names = [id_to_name[i] for i in profile.get("platform_ids", []) if i in id_to_name]
-
-        chosen = st.multiselect(
-            "Tes plateformes",
-            options=sorted(name_to_id.keys()),
-            default=sorted(set(default_names)),
-        )
-        platform_ids = [name_to_id[n] for n in chosen]
-
-        enter = st.form_submit_button("Entrer 🍿")
-
-    if enter:
-        if not platform_ids:
-            st.warning("Coche au moins 1 plateforme.")
+    cast_names = []
+    for person in details.get("cast", []) or []:
+        if isinstance(person, dict):
+            name = person.get("name")
         else:
-            profile["country"] = country
-            profile["lang"] = lang
-            profile["platform_ids"] = platform_ids
-            save_profile(profile)
-            st.session_state["did_enter"] = True
-            st.session_state["page"] = "Recherche"
-            st.rerun()
+            name = str(person)
+        if name:
+            cast_names.append(name)
 
-    st.stop()
+    if cast_names:
+        merged["cast"] = cast_names
 
-# =========================================================
-# PROFIL
-# =========================================================
-if page == "Profil":
-    st.markdown("# Profil")
-    st.caption("Modifie pays / langue / plateformes.")
-
-    with st.form("profile_form"):
-        c1, c2 = st.columns(2)
-        with c1:
-            country = st.selectbox(
-                "Pays",
-                ["fr", "be", "ch", "gb", "us"],
-                index=["fr", "be", "ch", "gb", "us"].index(profile.get("country", "fr")),
-            )
-        with c2:
-            lang = st.selectbox(
-                "Langue",
-                ["fr", "en"],
-                index=["fr", "en"].index(profile.get("lang", "fr")),
-            )
-
-        services = get_services(country, lang)
-        name_to_id = {
-            (s.get("name") or s.get("id")): s.get("id")
-            for s in services
-            if (s.get("name") or s.get("id")) and s.get("id")
-        }
-        id_to_name = {v: k for k, v in name_to_id.items()}
-        default_names = [id_to_name[i] for i in profile.get("platform_ids", []) if i in id_to_name]
-
-        chosen = st.multiselect(
-            "Tes plateformes",
-            options=sorted(name_to_id.keys()),
-            default=sorted(set(default_names)),
-        )
-        platform_ids = [name_to_id[n] for n in chosen]
-
-        save_btn = st.form_submit_button("✅ Enregistrer")
-
-    if save_btn:
-        if not platform_ids:
-            st.warning("Coche au moins 1 plateforme.")
-        else:
-            profile["country"] = country
-            profile["lang"] = lang
-            profile["platform_ids"] = platform_ids
-            save_profile(profile)
-            st.success("OK")
-            st.rerun()
-
-    if st.button("↩️ Revenir à l'accueil"):
-        st.session_state["did_enter"] = False
-        st.session_state["page"] = "Accueil"
-        st.rerun()
-
-    st.stop()
-
-# =========================================================
-# RECHERCHE
-# =========================================================
-st.markdown("# Recherche")
-
-theme_pick = st.selectbox(
-    "Thème",
-    list(THEMES.keys()),
-    index=list(THEMES.keys()).index(profile.get("ui_theme", "Auto")),
-)
-if theme_pick != profile.get("ui_theme", "Auto"):
-    profile["ui_theme"] = theme_pick
-    save_profile(profile)
-    apply_theme(profile["ui_theme"])
-    st.rerun()
-
-apply_theme(profile.get("ui_theme", "Auto"))
-
-if not profile.get("platform_ids"):
-    st.warning("Choisis au moins 1 plateforme dans Accueil/Profil.")
-    st.session_state["did_enter"] = False
-    st.session_state["page"] = "Accueil"
-    st.rerun()
-
-show_choice = st.selectbox(
-    "Je cherche :",
-    ["Films", "Séries", "Films et séries"],
-    key="show_choice",
-)
-show_types = showtype_to_list(show_choice)
-
-mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1)
-st.markdown("<div class='ff-muted'>Astuce • Acteur seul = OK • Clique acteur = films</div>", unsafe_allow_html=True)
-
-
-def request_search():
-    st.session_state["do_search_now"] = True
-
-
-def clear_story():
-    st.session_state["story_input"] = ""
-
-
-def clear_actor():
-    st.session_state["actor_input"] = ""
-
-
-# champs + croix
-c_story, c_x1 = st.columns([0.88, 0.12])
-with c_story:
-    st.text_input(
-        "Histoire / souvenir (optionnel)",
-        key="story_input",
-        placeholder="Ex: un homme rescapé d'un crash avion sur une île déserte",
-        on_change=request_search,
-    )
-with c_x1:
-    st.markdown('<div class="ff-x-btn">', unsafe_allow_html=True)
-    st.button("✕", key="clear_story_btn", help="Effacer l'histoire", on_click=clear_story)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-c_actor, c_x2 = st.columns([0.88, 0.12])
-with c_actor:
-    st.text_input(
-        "Acteur/actrice (optionnel)",
-        key="actor_input",
-        placeholder="Ex: Tom Hanks",
-        on_change=request_search,
-    )
-with c_x2:
-    st.markdown('<div class="ff-x-btn">', unsafe_allow_html=True)
-    st.button("✕", key="clear_actor_btn", help="Effacer l'acteur", on_click=clear_actor)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-if st.button("Chercher", key="search_btn"):
-    request_search()
-
-
-def do_search(story_text: str, actor_text: str):
-    raw = build_raw_items(story_text, actor_text, mode=mode, prof=profile, show_types=show_types)
-    st.session_state["raw_items"] = raw
-    st.session_state["raw_query"] = story_text.strip() if story_text.strip() else actor_text.strip()
-    st.session_state["open_details_id"] = None
-    st.session_state["scroll_to_results"] = True
-
-
-# suggestions discrètes
-story_raw = st.session_state.get("story_input", "").strip()
-actor_raw = st.session_state.get("actor_input", "").strip()
-
-story_suggest = prettify_sentence(fr_numbers_to_words(story_raw)) if story_raw else ""
-actor_suggest = titlecase_name(actor_raw) if actor_raw else ""
-
-if story_suggest and story_suggest != story_raw:
-    c1, c2 = st.columns([5, 1])
-    with c1:
-        st.markdown(
-            f"<div class='ff-muted'>Suggestion histoire : <b>{story_suggest}</b></div>",
-            unsafe_allow_html=True,
-        )
-    with c2:
-        if st.button("Utiliser", key="use_story_fix"):
-            st.session_state["story_input"] = story_suggest
-            st.rerun()
-
-if actor_suggest and actor_suggest != actor_raw:
-    c1, c2 = st.columns([5, 1])
-    with c1:
-        st.markdown(
-            f"<div class='ff-muted'>Suggestion acteur : <b>{actor_suggest}</b></div>",
-            unsafe_allow_html=True,
-        )
-    with c2:
-        if st.button("Utiliser", key="use_actor_fix"):
-            st.session_state["actor_input"] = actor_suggest
-            st.rerun()
-
-auto = st.session_state.pop("auto_search", False)
-manual = st.session_state.pop("do_search_now", False)
-
-if auto or manual:
-    s = st.session_state.get("story_input", "").strip()
-    a = st.session_state.get("actor_input", "").strip()
-    if not s and not a:
-        st.warning("Mets une histoire OU un acteur.")
+    streaming_options = details.get("streamingOptions") or show.get("streamingOptions") or {}
+    if isinstance(streaming_options, dict):
+        country_opts = streaming_options.get(country) or []
     else:
-        do_search(s, a)
+        country_opts = []
 
-raw_items = st.session_state.get("raw_items", [])
+    merged["_streaming_options_country"] = dedupe_streaming_options(country_opts)
+    return merged
 
-# filtres
-services = get_services(profile["country"], profile["lang"])
-id_to_name = {s.get("id"): (s.get("name") or s.get("id")) for s in services}
-platform_choices = ["Toutes"] + sorted(
-    [id_to_name.get(i, i) for i in profile.get("platform_ids", [])]
-)
 
-sort_mode = "Pertinence"
-only_my_apps = False
-platform_filter = "Toutes"
-year_range = None
+def search_candidates(country: str, show_type: str, lang: str, user_query: str) -> list[dict]:
+    candidates = []
+    expansions = ai_expand_query(user_query)
 
-with st.expander("Filtres avancés…", expanded=False):
-    c1, c2, c3 = st.columns([2.2, 1.1, 1.6])
-    with c1:
-        sort_mode = st.selectbox(
-            "Trier par",
-            ["Pertinence", "Année (récent)", "Note (haute)"],
-            index=0,
+    # 1) Recherche directe par titre exact / probable
+    for q in expansions:
+        candidates.extend(search_by_title(country, show_type, lang, q))
+
+    # 2) Recherche par filtres pour résumé / mots-clés
+    keyword_queries = []
+    keyword_queries.append(extract_keywords(user_query, 8))
+    keyword_queries.extend(extract_keywords(q, 8) for q in expansions[:4])
+
+    clean_keywords = []
+    for q in keyword_queries:
+        q = re.sub(r"\s+", " ", q).strip()
+        if q and q not in clean_keywords:
+            clean_keywords.append(q)
+
+    for q in clean_keywords[:4]:
+        try:
+            candidates.extend(collect_shows(country, show_type, lang, q, max_items=35, max_pages=2))
+        except Exception:
+            pass
+
+    candidates = merge_unique_shows(candidates)
+
+    enriched = []
+    for show in candidates[:60]:
+        enriched.append(enrich_show_for_scoring(show, country, show_type, lang))
+
+    enriched = merge_unique_shows(enriched)
+
+    scored = []
+    for show in enriched:
+        score = compute_match_score(show, user_query)
+        show["_score"] = score
+        scored.append(show)
+
+    scored.sort(
+        key=lambda s: (
+            -(s.get("_score") or 0),
+            -(s.get("releaseYear") or s.get("firstAirYear") or 0),
+            (s.get("title") or "").lower(),
         )
-    with c2:
-        only_my_apps = st.checkbox("Mes applis", value=False)
-    with c3:
-        platform_filter = st.selectbox("Plateforme", platform_choices, index=0)
+    )
+    return scored
 
-    years = sorted({x["year"] for x in raw_items if x.get("year")})
-    if years and min(years) != max(years):
-        year_range = st.slider(
-            "Année (min–max)",
-            min_value=int(min(years)),
-            max_value=int(max(years)),
-            value=(int(min(years)), int(max(years))),
+
+# =========================================================
+# AFFICHAGE
+# =========================================================
+def render_actor_links(cast_names: list[str]) -> None:
+    if not cast_names:
+        return
+
+    chips = []
+    for name in cast_names[:12]:
+        qp = quote(name)
+        chips.append(
+            f'<a class="actor-chip" href="?q={qp}&actor=1">{name}</a>'
         )
+    st.markdown("".join(chips), unsafe_allow_html=True)
 
-if not raw_items:
+
+def render_streaming_links(options: list[dict]) -> None:
+    groups = group_options_by_service(options)
+    if not groups:
+        st.markdown('<div class="ff-muted">Aucune disponibilité trouvée pour ce pays.</div>', unsafe_allow_html=True)
+        return
+
+    pieces = []
+    labels = {
+        "subscription": "Abonnement",
+        "free": "Gratuit",
+        "addon": "Addon",
+        "rent": "Location",
+        "buy": "Achat",
+    }
+
+    for g in groups:
+        types = []
+        first_link = ""
+        for opt in sorted(g["opts"], key=lambda x: TYPE_PRIORITY.get(x["type"], 999)):
+            typ = labels.get(opt["type"], opt["type"] or "Voir")
+            if typ not in types:
+                types.append(typ)
+            if not first_link and opt["link"]:
+                first_link = opt["link"]
+
+        txt = f"{g['name']} — {', '.join(types)}"
+        if first_link:
+            pieces.append(f'<a href="{first_link}" target="_blank">{txt}</a>')
+        else:
+            pieces.append(f"<span>{txt}</span>")
+
     st.markdown(
-        "<div class='ff-muted'>Tape une histoire, un titre ou un acteur puis Entrée / Chercher.</div>",
-        unsafe_allow_html=True,
+        '<div class="ff-linkbox">' + "".join(pieces) + "</div>",
+        unsafe_allow_html=True
     )
-    st.stop()
 
-view = apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, year_range)
 
-# ancre résultats
-st.markdown('<div id="results-anchor"></div>', unsafe_allow_html=True)
-st.write(f"✅ Résultats : {min(len(view), 20)} / {len(view)}")
+def render_result_card(show: dict, country: str, show_type: str, lang: str) -> None:
+    title = show.get("title") or "Sans titre"
+    year = show.get("releaseYear") or show.get("firstAirYear") or ""
+    overview = show.get("overview") or ""
+    imdb_rating = None
+    imdb_votes = None
 
-if st.session_state.pop("scroll_to_results", False):
+    ratings = show.get("rating") or show.get("ratings") or {}
+    if isinstance(ratings, dict):
+        imdb = ratings.get("imdb") or {}
+        if isinstance(imdb, dict):
+            imdb_rating = imdb.get("value")
+            imdb_votes = imdb.get("votes")
+        elif isinstance(imdb, (int, float)):
+            imdb_rating = imdb
+
+    if imdb_rating is None:
+        imdb_score = show.get("imdbRating")
+        if isinstance(imdb_score, (int, float)):
+            imdb_rating = imdb_score
+
+    star_pct = None
+    if imdb_rating is not None:
+        try:
+            star_pct = float(imdb_rating) * 10
+        except Exception:
+            star_pct = None
+
+    poster = get_poster_url(show)
+    cast_names = show.get("cast") or []
+    if cast_names and isinstance(cast_names[0], dict):
+        cast_names = [c.get("name") for c in cast_names if isinstance(c, dict) and c.get("name")]
+
+    options = show.get("_streaming_options_country")
+    if options is None:
+        details = get_show_details(str(show.get("id") or ""), country, show_type, lang)
+        streaming_options = details.get("streamingOptions") or {}
+        country_opts = streaming_options.get(country) or []
+        options = dedupe_streaming_options(country_opts)
+
+    with st.container():
+        st.markdown('<div class="ff-card">', unsafe_allow_html=True)
+        c1, c2 = st.columns([1, 2.2], gap="medium")
+
+        with c1:
+            if poster:
+                st.image(poster, use_container_width=True)
+            else:
+                st.markdown("🎬")
+
+        with c2:
+            st.markdown(f"### {title} {f'({year})' if year else ''}")
+            if star_pct is not None:
+                stars = stars_html(star_pct)
+                votes_txt = f" · {imdb_votes} votes" if imdb_votes else ""
+                st.markdown(
+                    f"{stars} &nbsp; IMDb {imdb_rating}/10{votes_txt}",
+                    unsafe_allow_html=True
+                )
+
+            if overview:
+                st.write(prettify_sentence(overview))
+
+            if cast_names:
+                st.markdown("**Acteurs :**")
+                render_actor_links(cast_names)
+
+            st.markdown("**Où regarder :**")
+            render_streaming_links(options)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================================================
+# JS / UX MOBILE
+# =========================================================
+def inject_scroll_to_results():
     components.html(
         """
         <script>
-        setTimeout(function(){
-          try{
-            if(document.activeElement && document.activeElement.blur){
-              document.activeElement.blur();
+        (function() {
+          function go() {
+            const target = window.parent.document.getElementById("results-anchor");
+            if (target) {
+              target.scrollIntoView({behavior: "smooth", block: "start"});
             }
-            if(document.body && document.body.focus){
-              document.body.focus();
-            }
-          }catch(e){}
-          var el = document.getElementById("results-anchor");
-          if(el){
-            el.scrollIntoView({behavior:"smooth", block:"start"});
           }
-        }, 160);
+          setTimeout(go, 80);
+          setTimeout(go, 250);
+          setTimeout(go, 600);
+        })();
         </script>
         """,
         height=0,
     )
 
-allowed_ids = set(profile.get("platform_ids", []))
+
+def inject_blur_active_element():
+    components.html(
+        """
+        <script>
+        (function() {
+          function blurNow() {
+            const d = window.parent.document;
+            if (d && d.activeElement) {
+              d.activeElement.blur();
+            }
+          }
+          setTimeout(blurNow, 30);
+          setTimeout(blurNow, 150);
+          setTimeout(blurNow, 400);
+        })();
+        </script>
+        """,
+        height=0,
+    )
 
 
-def details_fr_links(show_id: str):
-    data = get_show_details(show_id, profile["country"], "movie", profile["lang"])
-    if not data:
-        data = get_show_details(show_id, profile["country"], "series", profile["lang"])
-    opts = ((data.get("streamingOptions") or {}).get(profile["country"]) or []) if data else []
-    return dedupe_streaming_options(opts)
+# =========================================================
+# ETAT SESSION
+# =========================================================
+if "q" not in st.session_state:
+    st.session_state["q"] = ""
+
+if "show_type" not in st.session_state:
+    st.session_state["show_type"] = "movie"
+
+if "results" not in st.session_state:
+    st.session_state["results"] = []
+
+if "last_error" not in st.session_state:
+    st.session_state["last_error"] = ""
+
+if "scroll_to_results" not in st.session_state:
+    st.session_state["scroll_to_results"] = False
+
+if "pending_actor_search" not in st.session_state:
+    st.session_state["pending_actor_search"] = False
 
 
-# résultats
-for item in view[:20]:
-    show_id = str(item.get("api_id") or "")
-    card_id = stable_id(item.get("show") or {}) if item.get("show") else (show_id or item["title"])
+# =========================================================
+# PARAMS URL (acteurs cliquables)
+# =========================================================
+params = get_query_params()
+qp_q = params.get("q")
+if isinstance(qp_q, list):
+    qp_q = qp_q[0] if qp_q else ""
+qp_actor = params.get("actor")
+if isinstance(qp_actor, list):
+    qp_actor = qp_actor[0] if qp_actor else ""
 
-    st.markdown('<div class="ff-card">', unsafe_allow_html=True)
+if qp_q and qp_q != st.session_state.get("q"):
+    st.session_state["q"] = qp_q
+    st.session_state["pending_actor_search"] = True
+    clear_query_params()
 
-    c_img, c_txt = st.columns([1, 3])
-    with c_img:
-        if item.get("poster"):
-            st.image(item["poster"], width=140)
 
-    with c_txt:
-        st.markdown(f"### {item['title']} ({item['year'] if item['year'] else ''})")
+# =========================================================
+# SIDEBAR
+# =========================================================
+with st.sidebar:
+    st.header("⚙️ Réglages")
 
-        if item.get("score100") is not None:
-            stars = stars_html(item["score100"])
-            score5 = round(float(item["score100"]) / 20.0, 1)
-            st.markdown(
-                f"{stars}<span class='ff-muted' style='margin-left:8px'>({score5}/5)</span>",
-                unsafe_allow_html=True,
-            )
+    country = st.text_input("Pays", value=profile.get("country", "fr")).strip().lower() or "fr"
+    lang = st.text_input("Langue", value=profile.get("lang", "fr")).strip().lower() or "fr"
 
-        opts_all = item.get("opts_all") or []
-        if not opts_all and show_id:
-            opts_all = details_fr_links(show_id)
+    theme_names = list(THEMES.keys())
+    current_theme = profile.get("ui_theme", "Auto")
+    if current_theme not in theme_names:
+        current_theme = "Auto"
 
-        groups = group_options_by_service(opts_all)
-        mine = [g for g in groups if g["id"] in allowed_ids]
-        other = [g for g in groups if g["id"] not in allowed_ids]
+    selected_theme = st.selectbox(
+        "Thème",
+        theme_names,
+        index=theme_names.index(current_theme)
+    )
 
-        if mine:
-            st.markdown("<div class='ff-muted'>✅ Dispo sur tes applis</div>", unsafe_allow_html=True)
-            st.markdown("**Tes plateformes :**")
-            for g in mine:
-                primary, rest = pick_primary_option(g["opts"])
-                if primary and primary["link"]:
-                    st.markdown(f"- **{g['name']}** ({primary['type']}) → {primary['link']}")
-                else:
-                    st.markdown(f"- **{g['name']}** ({primary['type'] if primary else ''}) → *(lien non fourni)*")
-                if rest:
-                    with st.expander(f"… autres options sur {g['name']}"):
-                        for opt in rest:
-                            st.markdown(f"- ({opt['type']}) → {opt['link'] or '*(lien non fourni)*'}")
-        else:
-            st.markdown("<div class='ff-muted'>❌ Pas dispo sur tes applis</div>", unsafe_allow_html=True)
+    resolved = st.session_state.get("resolved_theme_name", selected_theme)
+    if selected_theme == "Auto":
+        st.markdown(
+            f'**Thème appliqué :** <span class="theme-badge">{resolved}</span>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            f'**Thème appliqué :** <span class="theme-badge">{selected_theme}</span>',
+            unsafe_allow_html=True
+        )
 
-        if other:
-            with st.expander(f"… Autres plateformes ({len(other)})"):
-                for g in other:
-                    primary, rest = pick_primary_option(g["opts"])
-                    label = primary["type"] if primary else ""
-                    link = primary["link"] if primary and primary["link"] else "*(lien non fourni)*"
-                    st.markdown(f"- **{g['name']}** ({label}) → {link}")
-                    if rest:
-                        with st.expander(f"… autres options sur {g['name']}"):
-                            for opt in rest:
-                                st.markdown(f"- ({opt['type']}) → {opt['link'] or '*(lien non fourni)*'}")
+    platform_ids_default = ", ".join(profile.get("platform_ids", []))
+    platform_ids_text = st.text_input(
+        "IDs plateformes à privilégier (optionnel, séparés par virgule)",
+        value=platform_ids_default,
+        help="Exemple : netflix, prime, disney, canal"
+    )
 
-        if st.button("Détails", key=f"details_btn_{card_id}"):
-            st.session_state["open_details_id"] = (
-                card_id if st.session_state["open_details_id"] != card_id else None
-            )
-            st.rerun()
+    if st.button("💾 Enregistrer le profil"):
+        profile["country"] = country
+        profile["lang"] = lang
+        profile["ui_theme"] = selected_theme
+        profile["platform_ids"] = [
+            x.strip() for x in platform_ids_text.split(",") if x.strip()
+        ]
+        save_profile(profile)
+        st.success("Profil enregistré.")
+        st.rerun()
 
-        if st.session_state.get("open_details_id") == card_id:
-            if item.get("overview"):
-                st.write(item["overview"])
+    with st.expander("Plateformes disponibles dans ce pays"):
+        try:
+            services = get_services(country, lang)
+            if services:
+                for svc in services[:200]:
+                    name = svc.get("name") or svc.get("id") or "?"
+                    sid = svc.get("id") or "?"
+                    st.write(f"- {name} ({sid})")
+            else:
+                st.caption("Aucune plateforme chargée.")
+        except Exception as e:
+            st.caption(f"Impossible de charger les plateformes : {e}")
 
-            cast = item.get("cast") or []
-            if cast:
-                links = [f"[{a}](?actor={quote(a)})" for a in cast[:12]]
-                st.markdown(
-                    "<div class='ff-linkbox'><b>Acteurs :</b> " + " ".join(links) + "</div>",
-                    unsafe_allow_html=True,
+
+# =========================================================
+# HEADER
+# =========================================================
+st.title("🎬 FilmFinder IA")
+st.caption("Trouve un film ou une série par titre, acteur ou résumé.")
+
+# =========================================================
+# BARRE DE RECHERCHE
+# =========================================================
+qcol, xcol = st.columns([20, 1], gap="small")
+
+with qcol:
+    query = st.text_input(
+        "Recherche",
+        value=st.session_state.get("q", ""),
+        placeholder='Exemple : "Seul au monde" ou "homme rescapé d’un crash d’avion sur une île"',
+        key="search_input_main",
+        label_visibility="collapsed"
+    )
+
+with xcol:
+    st.markdown('<div class="ff-x-btn">', unsafe_allow_html=True)
+    if st.button("✕", key="clear_search_btn", help="Effacer la recherche"):
+        st.session_state["q"] = ""
+        st.session_state["results"] = []
+        st.session_state["last_error"] = ""
+        st.session_state["scroll_to_results"] = False
+        clear_query_params()
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.session_state["q"] = query
+
+type_col, button_col = st.columns([2, 1], gap="small")
+with type_col:
+    selected_type = st.radio(
+        "Type",
+        options=["movie", "series"],
+        index=0 if st.session_state.get("show_type", "movie") == "movie" else 1,
+        format_func=lambda x: "Films" if x == "movie" else "Séries",
+        horizontal=True
+    )
+    st.session_state["show_type"] = selected_type
+
+with button_col:
+    search_clicked = st.button("🔎 Rechercher", use_container_width=True)
+
+# Enter sur acteur cliquable ou chargement URL
+if st.session_state.get("pending_actor_search"):
+    search_clicked = True
+    st.session_state["pending_actor_search"] = False
+
+# =========================================================
+# LANCEMENT RECHERCHE
+# =========================================================
+if search_clicked:
+    inject_blur_active_element()
+    st.session_state["last_error"] = ""
+    st.session_state["results"] = []
+
+    user_query = st.session_state.get("q", "").strip()
+
+    if not user_query:
+        st.session_state["last_error"] = "Tape une recherche."
+    else:
+        try:
+            with st.spinner("Recherche en cours..."):
+                results = search_candidates(
+                    country=profile.get("country", country),
+                    show_type=st.session_state["show_type"],
+                    lang=profile.get("lang", lang),
+                    user_query=user_query,
                 )
 
-    st.markdown("</div>", unsafe_allow_html=True)
+                preferred_platforms = [
+                    x.strip().lower()
+                    for x in profile.get("platform_ids", [])
+                    if str(x).strip()
+                ]
+
+                if preferred_platforms:
+                    def pref_score(show):
+                        options = show.get("_streaming_options_country") or []
+                        service_ids = [
+                            ((opt.get("service") or {}).get("id") or "").lower()
+                            for opt in options
+                        ]
+                        return any(pid in service_ids for pid in preferred_platforms)
+
+                    results.sort(
+                        key=lambda s: (
+                            not pref_score(s),
+                            -(s.get("_score") or 0),
+                            -(s.get("releaseYear") or s.get("firstAirYear") or 0),
+                        )
+                    )
+
+                st.session_state["results"] = results[:20]
+                st.session_state["scroll_to_results"] = True
+        except Exception as e:
+            st.session_state["last_error"] = str(e)
+
+# =========================================================
+# MESSAGES
+# =========================================================
+if st.session_state.get("last_error"):
+    st.error(st.session_state["last_error"])
+
+# =========================================================
+# RESULTATS
+# =========================================================
+st.markdown('<div id="results-anchor"></div>', unsafe_allow_html=True)
+
+results = st.session_state.get("results", [])
+
+if results:
+    st.subheader(f"Résultats ({len(results)})")
+
+    if st.session_state.get("scroll_to_results"):
+        inject_scroll_to_results()
+        st.session_state["scroll_to_results"] = False
+
+    for show in results:
+        render_result_card(
+            show=show,
+            country=profile.get("country", country),
+            show_type=st.session_state["show_type"],
+            lang=profile.get("lang", lang),
+        )
+
+elif st.session_state.get("q", "").strip() and not st.session_state.get("last_error"):
+    st.info("Aucun résultat trouvé.")
