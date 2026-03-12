@@ -1,6 +1,5 @@
 import json
 import os
-import random
 import re
 import unicodedata
 from datetime import date, timedelta
@@ -41,12 +40,11 @@ THEMES = {
         "bg2": "#fff7ec",
         "accent": "#b85c38",
         "text": "#151515",
-        "muted": "rgba(0,0,0,0.66)",
-        "card": "rgba(255,255,255,0.90)",
+        "muted": "rgba(0,0,0,0.68)",
+        "card": "rgba(255,255,255,0.92)",
         "border": "rgba(0,0,0,0.12)",
         "input_bg": "#ffffff",
         "input_text": "#111111",
-        "hero_grad": "linear-gradient(135deg, rgba(184,92,56,0.22), rgba(255,255,255,0.88))",
         "emoji": "🎞️",
     },
     "Romance": {
@@ -54,12 +52,11 @@ THEMES = {
         "bg2": "#fff9fb",
         "accent": "#ff4d6d",
         "text": "#151515",
-        "muted": "rgba(0,0,0,0.66)",
-        "card": "rgba(255,255,255,0.92)",
+        "muted": "rgba(0,0,0,0.68)",
+        "card": "rgba(255,255,255,0.93)",
         "border": "rgba(0,0,0,0.10)",
         "input_bg": "#ffffff",
         "input_text": "#111111",
-        "hero_grad": "linear-gradient(135deg, rgba(255,77,109,0.20), rgba(255,255,255,0.92))",
         "emoji": "💕",
     },
     "Science-fiction": {
@@ -67,12 +64,11 @@ THEMES = {
         "bg2": "#13233f",
         "accent": "#00d4ff",
         "text": "#f6fbff",
-        "muted": "rgba(255,255,255,0.78)",
+        "muted": "rgba(255,255,255,0.80)",
         "card": "rgba(255,255,255,0.10)",
         "border": "rgba(255,255,255,0.18)",
         "input_bg": "rgba(255,255,255,0.14)",
         "input_text": "#ffffff",
-        "hero_grad": "linear-gradient(135deg, rgba(0,212,255,0.22), rgba(255,255,255,0.10))",
         "emoji": "🚀",
     },
     "Horreur": {
@@ -80,12 +76,11 @@ THEMES = {
         "bg2": "#1c0d11",
         "accent": "#ff0033",
         "text": "#fff7f8",
-        "muted": "rgba(255,255,255,0.78)",
+        "muted": "rgba(255,255,255,0.80)",
         "card": "rgba(255,255,255,0.09)",
         "border": "rgba(255,255,255,0.16)",
         "input_bg": "rgba(255,255,255,0.14)",
         "input_text": "#ffffff",
-        "hero_grad": "linear-gradient(135deg, rgba(255,0,51,0.24), rgba(255,255,255,0.08))",
         "emoji": "🩸",
     },
     "Été": {
@@ -93,12 +88,11 @@ THEMES = {
         "bg2": "#fffdf6",
         "accent": "#ffb703",
         "text": "#151515",
-        "muted": "rgba(0,0,0,0.66)",
+        "muted": "rgba(0,0,0,0.68)",
         "card": "rgba(255,255,255,0.94)",
         "border": "rgba(0,0,0,0.10)",
         "input_bg": "#ffffff",
         "input_text": "#111111",
-        "hero_grad": "linear-gradient(135deg, rgba(255,183,3,0.24), rgba(255,255,255,0.92))",
         "emoji": "☀️",
     },
     "Halloween": {
@@ -106,12 +100,11 @@ THEMES = {
         "bg2": "#291938",
         "accent": "#ff7a00",
         "text": "#fff8f2",
-        "muted": "rgba(255,255,255,0.78)",
+        "muted": "rgba(255,255,255,0.80)",
         "card": "rgba(255,255,255,0.10)",
         "border": "rgba(255,255,255,0.16)",
         "input_bg": "rgba(255,255,255,0.14)",
         "input_text": "#ffffff",
-        "hero_grad": "linear-gradient(135deg, rgba(255,122,0,0.24), rgba(255,255,255,0.10))",
         "emoji": "🎃",
     },
     "Armistice": {
@@ -119,12 +112,11 @@ THEMES = {
         "bg2": "#163152",
         "accent": "#3a86ff",
         "text": "#f5f9ff",
-        "muted": "rgba(255,255,255,0.78)",
+        "muted": "rgba(255,255,255,0.80)",
         "card": "rgba(255,255,255,0.10)",
         "border": "rgba(255,255,255,0.16)",
         "input_bg": "rgba(255,255,255,0.14)",
         "input_text": "#ffffff",
-        "hero_grad": "linear-gradient(135deg, rgba(58,134,255,0.24), rgba(255,255,255,0.10))",
         "emoji": "🇫🇷",
     },
     "Fête des mères": {
@@ -132,12 +124,11 @@ THEMES = {
         "bg2": "#fffdfb",
         "accent": "#ff7aa2",
         "text": "#151515",
-        "muted": "rgba(0,0,0,0.66)",
+        "muted": "rgba(0,0,0,0.68)",
         "card": "rgba(255,255,255,0.94)",
         "border": "rgba(0,0,0,0.10)",
         "input_bg": "#ffffff",
         "input_text": "#111111",
-        "hero_grad": "linear-gradient(135deg, rgba(255,122,162,0.20), rgba(255,255,255,0.92))",
         "emoji": "🌷",
     },
     "Printemps": {
@@ -145,14 +136,25 @@ THEMES = {
         "bg2": "#fafffa",
         "accent": "#4caf50",
         "text": "#151515",
-        "muted": "rgba(0,0,0,0.66)",
+        "muted": "rgba(0,0,0,0.68)",
         "card": "rgba(255,255,255,0.94)",
         "border": "rgba(0,0,0,0.10)",
         "input_bg": "#ffffff",
         "input_text": "#111111",
-        "hero_grad": "linear-gradient(135deg, rgba(76,175,80,0.22), rgba(255,255,255,0.92))",
         "emoji": "🌿",
     },
+}
+
+THEME_SEED_TITLES = {
+    "Cinéma vintage": ["Casablanca", "Vertigo", "The Godfather"],
+    "Romance": ["The Notebook", "Titanic", "La La Land"],
+    "Science-fiction": ["Interstellar", "Blade Runner 2049", "The Matrix"],
+    "Horreur": ["The Shining", "It", "Halloween"],
+    "Été": ["Mamma Mia!", "Jaws", "The Beach"],
+    "Halloween": ["Halloween", "Scream", "Beetlejuice"],
+    "Armistice": ["1917", "Dunkirk", "Saving Private Ryan"],
+    "Fête des mères": ["Little Women", "Mamma Mia!", "The Blind Side"],
+    "Printemps": ["Amélie", "The Secret Garden", "Big Fish"],
 }
 
 
@@ -185,10 +187,12 @@ def choose_auto_theme_name() -> str:
     return pool[today.toordinal() % len(pool)]
 
 
-def apply_theme(theme_name: str) -> str:
-    if theme_name == "Auto":
-        theme_name = choose_auto_theme_name()
+def resolve_theme_name(theme_name: str) -> str:
+    return choose_auto_theme_name() if theme_name == "Auto" else theme_name
 
+
+def apply_theme(theme_name: str) -> str:
+    theme_name = resolve_theme_name(theme_name)
     theme = THEMES[theme_name]
 
     st.markdown(
@@ -209,7 +213,7 @@ def apply_theme(theme_name: str) -> str:
             inset: 0;
             pointer-events:none;
             background:
-                radial-gradient(circle at 18% 10%, rgba(255,255,255,0.07), transparent 30%),
+                radial-gradient(circle at 18% 10%, rgba(255,255,255,0.08), transparent 30%),
                 radial-gradient(circle at 82% 24%, rgba(255,255,255,0.05), transparent 34%),
                 repeating-linear-gradient(
                     0deg,
@@ -226,7 +230,7 @@ def apply_theme(theme_name: str) -> str:
         .main .block-container {{
             position: relative;
             z-index: 1;
-            max-width: 1350px !important;
+            max-width: 1360px !important;
             margin: 12px auto !important;
             background: {theme["card"]} !important;
             border: 1px solid {theme["border"]} !important;
@@ -246,7 +250,7 @@ def apply_theme(theme_name: str) -> str:
             color: {theme["text"]} !important;
         }}
 
-        label, p, span {{
+        label, p, span, small {{
             color: {theme["text"]} !important;
         }}
 
@@ -256,23 +260,69 @@ def apply_theme(theme_name: str) -> str:
         }}
 
         .ff-hero {{
-            background: {theme["hero_grad"]};
             border: 1px solid {theme["border"]};
-            border-radius: 18px;
-            padding: 16px 18px;
+            border-radius: 20px;
+            padding: 18px 18px 18px 18px;
             margin-bottom: 16px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.10);
+            overflow: hidden;
+            position: relative;
+            min-height: 180px;
+            display: flex;
+            align-items: end;
+            background: rgba(255,255,255,0.18);
+        }}
+
+        .ff-hero-bg {{
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            filter: blur(0.5px);
+            transform: scale(1.03);
+        }}
+
+        .ff-hero-overlay {{
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.55)),
+                linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00));
+        }}
+
+        .ff-hero-content {{
+            position: relative;
+            z-index: 2;
+            background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.88));
+            color: #111111 !important;
+            padding: 12px 14px;
+            border-radius: 16px;
+            max-width: 620px;
+            border: 1px solid rgba(255,255,255,0.92);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.12);
         }}
 
         .ff-hero-title {{
             font-size: 28px;
             font-weight: 800;
+            color: #111111 !important;
             margin-bottom: 4px;
         }}
 
         .ff-hero-sub {{
             font-size: 14px;
+            color: #111111 !important;
             opacity: 0.90;
+        }}
+
+        .ff-labelbox {{
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,245,245,0.94));
+            color: #111111 !important;
+            border: 1px solid rgba(220,220,220,0.95);
+            margin-bottom: 6px;
         }}
 
         input, textarea {{
@@ -351,11 +401,21 @@ def apply_theme(theme_name: str) -> str:
             display: block;
         }}
 
-        .ff-x-btn button {{
-            width: 100%;
-            padding: 0.30rem 0.5rem !important;
-            min-height: 38px !important;
-            line-height: 1 !important;
+        /* croix visuellement dans le champ */
+        .ff-x-holder {{
+            margin-left: -54px;
+            z-index: 10;
+            position: relative;
+            top: 2px;
+        }}
+
+        .ff-x-holder button {{
+            width: 42px !important;
+            min-width: 42px !important;
+            min-height: 36px !important;
+            height: 36px !important;
+            border-radius: 10px !important;
+            padding: 0 !important;
             font-size: 18px !important;
         }}
         </style>
@@ -436,6 +496,13 @@ SYNONYMS = {
     "naufrage": ["castaway", "survivor"],
     "naufragé": ["castaway", "survivor"],
     "perdu": ["lost"],
+}
+
+EXACT_ALIASES = {
+    "seul au monde": ["Seul au monde", "Cast Away"],
+    "cast away": ["Cast Away", "Seul au monde"],
+    "a nous quatre": ["À nous quatre", "The Parent Trap"],
+    "à nous quatre": ["À nous quatre", "The Parent Trap"],
 }
 
 RULE_HINTS = [
@@ -746,6 +813,26 @@ def pick_primary_option(opts: list):
 
 
 # =========================================================
+# THEME POSTER
+# =========================================================
+@st.cache_data(show_spinner=False, ttl=86400)
+def get_theme_background_poster(theme_name: str, country: str, lang: str):
+    seed_titles = THEME_SEED_TITLES.get(theme_name, [])
+    for title in seed_titles:
+        try:
+            results = search_by_title(country, "movie", lang, title)
+            if not results:
+                results = search_by_title("us", "movie", lang, title)
+            for item in results:
+                poster = get_poster_url(item)
+                if poster:
+                    return poster
+        except Exception:
+            continue
+    return ""
+
+
+# =========================================================
 # BANDE-ANNONCE DIRECTE YOUTUBE
 # =========================================================
 @st.cache_data(show_spinner=False, ttl=86400)
@@ -770,11 +857,9 @@ def trailer_direct_url(title: str, year=None):
             timeout=12,
         )
         text = response.text
-
         ids = re.findall(r"watch\\?v=([A-Za-z0-9_-]{11})", text)
         if not ids:
             ids = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', text)
-
         seen = set()
         ids = [x for x in ids if not (x in seen or seen.add(x))]
         if ids:
@@ -860,6 +945,22 @@ def showtype_to_list(choice: str):
     return ["movie", "series"]
 
 
+def exact_alias_titles(query: str):
+    q = norm_loose(query)
+    titles = [query]
+    for k, vals in EXACT_ALIASES.items():
+        if q == norm_loose(k):
+            titles.extend(vals)
+    out = []
+    seen = set()
+    for t in titles:
+        key = norm_loose(t)
+        if key not in seen:
+            seen.add(key)
+            out.append(t)
+    return out
+
+
 def apply_rule_hints(story: str):
     story_loose = norm_loose(story)
     out = []
@@ -933,7 +1034,7 @@ def exact_title_match_score(title: str, query: str) -> int:
     if not t or not q:
         return 0
     if t == q:
-        return 2
+        return 3
     if q in t or t in q:
         return 1
     return 0
@@ -986,16 +1087,19 @@ def build_raw_items(story: str, actor: str, mode: str, prof: dict, show_types: l
                 source_country[sid] = ctry
         return shows
 
-    # 1) titre exact d'abord
+    # 1) titre exact + alias d'abord
     if story:
-        for stype in show_types:
-            exact = search_by_title(country, stype, lang, story)
-            if exact:
-                found += add_chunk(country, exact)
+        for title_candidate in exact_alias_titles(story):
+            for stype in show_types:
+                exact = search_by_title(country, stype, lang, title_candidate)
+                if not exact:
+                    exact = search_by_title("us", stype, lang, title_candidate)
+                if exact:
+                    found += add_chunk(country, exact)
 
+    # 2) variantes
     variants = build_query_variants(story, actor, mode)[: pre["variants_max"]]
 
-    # 2) recherche mots-clés
     for stype in show_types:
         for kw in variants:
             found += add_chunk(
@@ -1141,6 +1245,7 @@ st.session_state.setdefault("auto_search", False)
 st.session_state.setdefault("do_search_now", False)
 st.session_state.setdefault("open_details_id", None)
 st.session_state.setdefault("scroll_to_results", False)
+st.session_state.setdefault("restore_card_id", None)
 
 # clic acteur
 qp = get_query_params()
@@ -1181,13 +1286,20 @@ page = st.session_state["page"]
 if page == "Accueil":
     st.markdown("# FilmFinder IA")
 
-    actual_theme = ACTIVE_THEME_NAME
+    actual_theme = resolve_theme_name(profile.get("ui_theme", "Auto"))
     emoji = THEMES[actual_theme]["emoji"]
+    hero_poster = get_theme_background_poster(actual_theme, profile.get("country", "fr"), profile.get("lang", "fr"))
+
+    hero_style = f"background-image:url('{hero_poster}');" if hero_poster else ""
     st.markdown(
         f"""
         <div class="ff-hero">
-            <div class="ff-hero-title">{emoji} Thème actif : {actual_theme}</div>
-            <div class="ff-hero-sub">Choisis tes plateformes une fois, puis entre.</div>
+            <div class="ff-hero-bg" style="{hero_style}"></div>
+            <div class="ff-hero-overlay"></div>
+            <div class="ff-hero-content">
+                <div class="ff-hero-title">{emoji} Thème actif : {actual_theme}</div>
+                <div class="ff-hero-sub">Choisis tes plateformes une fois, puis entre.</div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1317,13 +1429,20 @@ if page == "Profil":
 # =========================================================
 st.markdown("# Recherche")
 
-actual_theme = ACTIVE_THEME_NAME
+actual_theme = resolve_theme_name(profile.get("ui_theme", "Auto"))
 emoji = THEMES[actual_theme]["emoji"]
+theme_poster = get_theme_background_poster(actual_theme, profile.get("country", "fr"), profile.get("lang", "fr"))
+hero_style = f"background-image:url('{theme_poster}');" if theme_poster else ""
+
 st.markdown(
     f"""
     <div class="ff-hero">
-        <div class="ff-hero-title">{emoji} Thème actif : {actual_theme}</div>
-        <div class="ff-hero-sub">Recherche par histoire, souvenir, titre exact ou acteur.</div>
+        <div class="ff-hero-bg" style="{hero_style}"></div>
+        <div class="ff-hero-overlay"></div>
+        <div class="ff-hero-content">
+            <div class="ff-hero-title">{emoji} Thème actif : {actual_theme}</div>
+            <div class="ff-hero-sub">Recherche par histoire, souvenir, titre exact ou acteur.</div>
+        </div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -1339,7 +1458,7 @@ if theme_pick != profile.get("ui_theme", "Auto"):
     save_profile(profile)
     st.rerun()
 
-apply_theme(profile.get("ui_theme", "Auto"))
+ACTIVE_THEME_NAME = apply_theme(profile.get("ui_theme", "Auto"))
 
 if not profile.get("platform_ids"):
     st.warning("Choisis au moins 1 plateforme dans Accueil/Profil.")
@@ -1347,14 +1466,14 @@ if not profile.get("platform_ids"):
     st.session_state["page"] = "Accueil"
     st.rerun()
 
-top1, top2 = st.columns(2)
-with top1:
+row_top1, row_top2 = st.columns(2)
+with row_top1:
     show_choice = st.selectbox(
         "Je cherche :",
         ["Films", "Séries", "Films et séries"],
         key="show_choice",
     )
-with top2:
+with row_top2:
     mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1)
 
 show_types = showtype_to_list(show_choice)
@@ -1377,7 +1496,7 @@ def clear_actor():
     st.session_state["actor_input"] = ""
 
 
-c_story, c_x1 = st.columns([0.93, 0.07])
+c_story, c_x1 = st.columns([0.965, 0.035])
 with c_story:
     st.text_input(
         "Histoire / souvenir / titre exact",
@@ -1386,11 +1505,11 @@ with c_story:
         on_change=request_search,
     )
 with c_x1:
-    st.markdown('<div class="ff-x-btn">', unsafe_allow_html=True)
+    st.markdown('<div class="ff-x-holder">', unsafe_allow_html=True)
     st.button("✕", key="clear_story_btn", help="Effacer", on_click=clear_story)
     st.markdown("</div>", unsafe_allow_html=True)
 
-c_actor, c_x2 = st.columns([0.93, 0.07])
+c_actor, c_x2 = st.columns([0.965, 0.035])
 with c_actor:
     st.text_input(
         "Acteur/actrice (optionnel)",
@@ -1399,7 +1518,7 @@ with c_actor:
         on_change=request_search,
     )
 with c_x2:
-    st.markdown('<div class="ff-x-btn">', unsafe_allow_html=True)
+    st.markdown('<div class="ff-x-holder">', unsafe_allow_html=True)
     st.button("✕", key="clear_actor_btn", help="Effacer", on_click=clear_actor)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1413,6 +1532,7 @@ def do_search(story_text: str, actor_text: str):
     st.session_state["raw_query"] = story_text.strip() if story_text.strip() else actor_text.strip()
     st.session_state["open_details_id"] = None
     st.session_state["scroll_to_results"] = True
+    st.session_state["restore_card_id"] = None
 
 
 story_raw = st.session_state.get("story_input", "").strip()
@@ -1469,7 +1589,6 @@ platform_filter = "Toutes"
 only_my_apps = False
 year_range = None
 
-# filtres visibles sur 3 colonnes
 f1, f2, f3 = st.columns(3)
 with f1:
     sort_mode = st.selectbox(
@@ -1500,7 +1619,8 @@ if not raw_items:
 
 view = apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, year_range)
 
-st.markdown('<div id="results-anchor"></div>', unsafe_allow_html=True)
+# ancre sur le premier film
+st.markdown('<div id="first-result-anchor"></div>', unsafe_allow_html=True)
 st.write(f"✅ Résultats : {min(len(view), 20)} / {len(view)}")
 
 if st.session_state.pop("scroll_to_results", False):
@@ -1519,11 +1639,27 @@ if st.session_state.pop("scroll_to_results", False):
             }
           }catch(e){}
 
-          const el = document.getElementById("results-anchor");
+          const el = document.getElementById("first-result-anchor");
           if(el){
             el.scrollIntoView({behavior:"smooth", block:"start"});
           }
         }, 180);
+        </script>
+        """,
+        height=0,
+    )
+
+restore_card_id = st.session_state.pop("restore_card_id", None)
+if restore_card_id:
+    components.html(
+        f"""
+        <script>
+        setTimeout(function(){{
+          const el = document.getElementById("card-{restore_card_id}");
+          if(el){{
+            el.scrollIntoView({{behavior:"auto", block:"start"}});
+          }}
+        }}, 80);
         </script>
         """,
         height=0,
@@ -1540,10 +1676,11 @@ def details_fr_links(show_id: str):
     return dedupe_streaming_options(opts)
 
 
-for item in view[:20]:
+for idx, item in enumerate(view[:20]):
     show_id = str(item.get("api_id") or "")
     card_id = stable_id(item.get("show") or {}) if item.get("show") else (show_id or item["title"])
 
+    st.markdown(f'<div id="card-{card_id}"></div>', unsafe_allow_html=True)
     st.markdown('<div class="ff-card">', unsafe_allow_html=True)
 
     c_img, c_txt = st.columns([1, 3])
@@ -1608,6 +1745,7 @@ for item in view[:20]:
             st.session_state["open_details_id"] = (
                 card_id if st.session_state["open_details_id"] != card_id else None
             )
+            st.session_state["restore_card_id"] = card_id
             st.rerun()
 
         if st.session_state.get("open_details_id") == card_id:
