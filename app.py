@@ -31,395 +31,6 @@ PROFILE_PATH = APP_DIR / "profile.json"
 st.set_page_config(page_title="FilmFinder IA", layout="wide")
 
 # =========================================================
-# THEMES AUTO
-# =========================================================
-THEMES = {
-    "Cinéma vintage": {
-        "bg1": "#e8dcc7",
-        "bg2": "#fff7ec",
-        "accent": "#b85c38",
-        "text": "#151515",
-        "muted": "rgba(0,0,0,0.68)",
-        "card": "rgba(255,255,255,0.92)",
-        "border": "rgba(0,0,0,0.12)",
-        "input_bg": "#ffffff",
-        "input_text": "#111111",
-        "emoji": "🎞️",
-    },
-    "Romance": {
-        "bg1": "#ffe5ee",
-        "bg2": "#fff9fb",
-        "accent": "#ff4d6d",
-        "text": "#151515",
-        "muted": "rgba(0,0,0,0.68)",
-        "card": "rgba(255,255,255,0.93)",
-        "border": "rgba(0,0,0,0.10)",
-        "input_bg": "#ffffff",
-        "input_text": "#111111",
-        "emoji": "💕",
-    },
-    "Science-fiction": {
-        "bg1": "#06111f",
-        "bg2": "#13233f",
-        "accent": "#00d4ff",
-        "text": "#f6fbff",
-        "muted": "rgba(255,255,255,0.80)",
-        "card": "rgba(255,255,255,0.10)",
-        "border": "rgba(255,255,255,0.18)",
-        "input_bg": "rgba(255,255,255,0.14)",
-        "input_text": "#ffffff",
-        "emoji": "🚀",
-    },
-    "Horreur": {
-        "bg1": "#0a0a0a",
-        "bg2": "#1c0d11",
-        "accent": "#ff0033",
-        "text": "#fff7f8",
-        "muted": "rgba(255,255,255,0.80)",
-        "card": "rgba(255,255,255,0.09)",
-        "border": "rgba(255,255,255,0.16)",
-        "input_bg": "rgba(255,255,255,0.14)",
-        "input_text": "#ffffff",
-        "emoji": "🩸",
-    },
-    "Été": {
-        "bg1": "#fff1c7",
-        "bg2": "#fffdf6",
-        "accent": "#ffb703",
-        "text": "#151515",
-        "muted": "rgba(0,0,0,0.68)",
-        "card": "rgba(255,255,255,0.94)",
-        "border": "rgba(0,0,0,0.10)",
-        "input_bg": "#ffffff",
-        "input_text": "#111111",
-        "emoji": "☀️",
-    },
-    "Halloween": {
-        "bg1": "#140c20",
-        "bg2": "#291938",
-        "accent": "#ff7a00",
-        "text": "#fff8f2",
-        "muted": "rgba(255,255,255,0.80)",
-        "card": "rgba(255,255,255,0.10)",
-        "border": "rgba(255,255,255,0.16)",
-        "input_bg": "rgba(255,255,255,0.14)",
-        "input_text": "#ffffff",
-        "emoji": "🎃",
-    },
-    "Armistice": {
-        "bg1": "#0c1629",
-        "bg2": "#163152",
-        "accent": "#3a86ff",
-        "text": "#f5f9ff",
-        "muted": "rgba(255,255,255,0.80)",
-        "card": "rgba(255,255,255,0.10)",
-        "border": "rgba(255,255,255,0.16)",
-        "input_bg": "rgba(255,255,255,0.14)",
-        "input_text": "#ffffff",
-        "emoji": "🇫🇷",
-    },
-    "Fête des mères": {
-        "bg1": "#fff0ea",
-        "bg2": "#fffdfb",
-        "accent": "#ff7aa2",
-        "text": "#151515",
-        "muted": "rgba(0,0,0,0.68)",
-        "card": "rgba(255,255,255,0.94)",
-        "border": "rgba(0,0,0,0.10)",
-        "input_bg": "#ffffff",
-        "input_text": "#111111",
-        "emoji": "🌷",
-    },
-    "Printemps": {
-        "bg1": "#e7f5e7",
-        "bg2": "#fafffa",
-        "accent": "#4caf50",
-        "text": "#151515",
-        "muted": "rgba(0,0,0,0.68)",
-        "card": "rgba(255,255,255,0.94)",
-        "border": "rgba(0,0,0,0.10)",
-        "input_bg": "#ffffff",
-        "input_text": "#111111",
-        "emoji": "🌿",
-    },
-}
-
-THEME_SEED_TITLES = {
-    "Cinéma vintage": ["Casablanca", "Vertigo", "The Godfather"],
-    "Romance": ["Titanic", "The Notebook", "La La Land"],
-    "Science-fiction": ["Interstellar", "The Matrix", "Blade Runner 2049"],
-    "Horreur": ["Halloween", "It", "The Shining"],
-    "Été": ["Mamma Mia!", "Jaws", "The Beach"],
-    "Halloween": ["Halloween", "Scream", "Beetlejuice"],
-    "Armistice": ["1917", "Dunkirk", "Saving Private Ryan"],
-    "Fête des mères": ["Little Women", "Mamma Mia!", "The Blind Side"],
-    "Printemps": ["Amélie", "Big Fish", "The Secret Garden"],
-}
-
-
-def last_sunday_of_may(year: int) -> date:
-    d = date(year, 5, 31)
-    while d.weekday() != 6:
-        d -= timedelta(days=1)
-    return d
-
-
-def choose_auto_theme_name() -> str:
-    today = date.today()
-
-    if (today.month == 10 and today.day >= 15) or (today.month == 11 and today.day == 1):
-        return "Halloween"
-    if today.month in (6, 7, 8):
-        return "Été"
-    if today.month in (3, 4, 5):
-        return "Printemps"
-    if today.month == 2 and 10 <= today.day <= 15:
-        return "Romance"
-    if today.month == 11 and 8 <= today.day <= 12:
-        return "Armistice"
-
-    mothers_day = last_sunday_of_may(today.year)
-    if mothers_day - timedelta(days=6) <= today <= mothers_day + timedelta(days=1):
-        return "Fête des mères"
-
-    pool = ["Cinéma vintage", "Romance", "Science-fiction", "Horreur", "Été"]
-    return pool[today.toordinal() % len(pool)]
-
-
-def apply_theme(theme_name: str) -> str:
-    theme_name = choose_auto_theme_name() if theme_name == "Auto" else theme_name
-    theme = THEMES[theme_name]
-
-    st.markdown(
-        f"""
-        <style>
-        :root {{
-            color-scheme: light !important;
-        }}
-
-        html, body, .stApp, [data-testid="stAppViewContainer"] {{
-            background: linear-gradient(180deg, {theme["bg1"]} 0%, {theme["bg2"]} 65%, {theme["bg2"]} 100%) !important;
-            color: {theme["text"]} !important;
-        }}
-
-        [data-testid="stAppViewContainer"]::before {{
-            content:"";
-            position: fixed;
-            inset: 0;
-            pointer-events:none;
-            background:
-                radial-gradient(circle at 18% 10%, rgba(255,255,255,0.08), transparent 30%),
-                radial-gradient(circle at 82% 24%, rgba(255,255,255,0.05), transparent 34%),
-                repeating-linear-gradient(
-                    0deg,
-                    rgba(255,255,255,0.015),
-                    rgba(255,255,255,0.015) 1px,
-                    rgba(0,0,0,0.015) 2px,
-                    rgba(0,0,0,0.015) 3px
-                );
-            opacity: 0.12;
-            mix-blend-mode: overlay;
-            z-index: 0;
-        }}
-
-        .main .block-container {{
-            position: relative;
-            z-index: 1;
-            max-width: 1360px !important;
-            margin: 12px auto !important;
-            background: {theme["card"]} !important;
-            border: 1px solid {theme["border"]} !important;
-            border-radius: 20px !important;
-            padding: 18px 20px 26px 20px !important;
-            box-shadow: 0 16px 42px rgba(0,0,0,0.12) !important;
-            backdrop-filter: blur(10px);
-        }}
-
-        [data-testid="stSidebar"] > div:first-child {{
-            background: {theme["card"]} !important;
-            border-right: 1px solid {theme["border"]} !important;
-        }}
-
-        [data-testid="stMarkdownContainer"],
-        [data-testid="stMarkdownContainer"] * {{
-            color: {theme["text"]} !important;
-        }}
-
-        label, p, span, small {{
-            color: {theme["text"]} !important;
-        }}
-
-        .ff-muted {{
-            color: {theme["muted"]} !important;
-            font-size: 13px;
-        }}
-
-        .ff-hero {{
-            border: 1px solid {theme["border"]};
-            border-radius: 20px;
-            padding: 18px;
-            margin-bottom: 16px;
-            box-shadow: 0 10px 24px rgba(0,0,0,0.10);
-            overflow: hidden;
-            position: relative;
-            min-height: 190px;
-            display: flex;
-            align-items: end;
-            background: rgba(255,255,255,0.18);
-        }}
-
-        .ff-hero-bg {{
-            position: absolute;
-            inset: 0;
-            background-size: cover;
-            background-position: center;
-            transform: scale(1.03);
-        }}
-
-        .ff-hero-overlay {{
-            position: absolute;
-            inset: 0;
-            background:
-                linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.62)),
-                linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.00));
-        }}
-
-        .ff-hero-content {{
-            position: relative;
-            z-index: 2;
-            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,248,248,0.92));
-            color: #111111 !important;
-            padding: 12px 14px;
-            border-radius: 16px;
-            max-width: 660px;
-            border: 1px solid rgba(255,255,255,0.92);
-            box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-        }}
-
-        .ff-hero-title {{
-            font-size: 28px;
-            font-weight: 800;
-            color: #111111 !important;
-            margin-bottom: 4px;
-        }}
-
-        .ff-hero-sub {{
-            font-size: 14px;
-            color: #111111 !important;
-            opacity: 0.90;
-        }}
-
-        .ff-labelbox {{
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 10px;
-            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,245,245,0.94));
-            color: #111111 !important;
-            border: 1px solid rgba(220,220,220,0.95);
-            margin-bottom: 6px;
-        }}
-
-        input, textarea {{
-            background: {theme["input_bg"]} !important;
-            color: {theme["input_text"]} !important;
-            border: 1px solid {theme["border"]} !important;
-            border-radius: 12px !important;
-        }}
-
-        [data-baseweb="select"] > div {{
-            background: {theme["input_bg"]} !important;
-            color: {theme["input_text"]} !important;
-            border: 1px solid {theme["border"]} !important;
-            border-radius: 12px !important;
-        }}
-
-        [data-baseweb="select"] * {{
-            color: {theme["input_text"]} !important;
-        }}
-
-        .stButton > button,
-        .stFormSubmitButton > button {{
-            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(242,242,242,0.95)) !important;
-            color: #111111 !important;
-            border: 1px solid #d9d9d9 !important;
-            border-radius: 12px !important;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.10);
-            font-weight: 600 !important;
-        }}
-
-        .stButton > button:hover,
-        .stFormSubmitButton > button:hover {{
-            border-color: {theme["accent"]} !important;
-        }}
-
-        .ff-card {{
-            border: 1px solid {theme["border"]};
-            background: {theme["card"]};
-            border-radius: 16px;
-            padding: 12px;
-            margin-top: 10px;
-            box-shadow: 0 10px 22px rgba(0,0,0,0.08);
-        }}
-
-        .ff-linkbox {{
-            display: inline-block;
-            padding: 4px 8px;
-            margin: 3px 4px 3px 0;
-            background: rgba(255,255,255,0.97);
-            border: 1px solid #e3e3e3;
-            border-radius: 10px;
-            color: #111111 !important;
-            text-decoration: none !important;
-        }}
-
-        .ff-stars {{
-            position: relative;
-            display: inline-block;
-            font-size: 16px;
-            line-height: 1;
-            letter-spacing: 1px;
-        }}
-
-        .ff-stars .bot {{
-            color: #d0d0d0;
-            display: block;
-        }}
-
-        .ff-stars .top {{
-            color: {theme["accent"]};
-            position: absolute;
-            left: 0;
-            top: 0;
-            overflow: hidden;
-            white-space: nowrap;
-            display: block;
-        }}
-
-        /* croix visuellement intégrée dans le champ */
-        .ff-x-holder {{
-            margin-left: -50px;
-            z-index: 10;
-            position: relative;
-            top: 2px;
-        }}
-
-        .ff-x-holder button {{
-            width: 40px !important;
-            min-width: 40px !important;
-            min-height: 36px !important;
-            height: 36px !important;
-            border-radius: 10px !important;
-            padding: 0 !important;
-            font-size: 18px !important;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    return theme_name
-
-
-# =========================================================
 # PROFILE
 # =========================================================
 def load_profile() -> dict:
@@ -429,11 +40,10 @@ def load_profile() -> dict:
             data.setdefault("country", "fr")
             data.setdefault("lang", "fr")
             data.setdefault("platform_ids", [])
-            data.setdefault("ui_theme", "Auto")
             return data
         except Exception:
             pass
-    return {"country": "fr", "lang": "fr", "platform_ids": [], "ui_theme": "Auto"}
+    return {"country": "fr", "lang": "fr", "platform_ids": []}
 
 
 def save_profile(profile: dict) -> None:
@@ -444,7 +54,6 @@ def save_profile(profile: dict) -> None:
 
 
 profile = load_profile()
-ACTIVE_THEME_NAME = apply_theme(profile.get("ui_theme", "Auto"))
 
 # =========================================================
 # NORMALISATION
@@ -619,9 +228,8 @@ def stars_html(score_0_100):
         f'</span>'
     )
 
-
 # =========================================================
-# STREAMLIT QUERY PARAMS
+# QUERY PARAMS
 # =========================================================
 def get_query_params() -> dict:
     if hasattr(st, "query_params"):
@@ -649,7 +257,6 @@ def clear_query_params() -> None:
             st.experimental_set_query_params()
         except Exception:
             pass
-
 
 # =========================================================
 # RAPIDAPI
@@ -805,10 +412,155 @@ def pick_primary_option(opts: list):
             return opt, [x for x in opts if x != opt]
     return opts[0], opts[1:]
 
+# =========================================================
+# THÈME AUTO + AFFICHE FOND
+# =========================================================
+THEMES = {
+    "Cinéma vintage": {
+        "bg1": "#e8dcc7",
+        "bg2": "#fff7ec",
+        "accent": "#b85c38",
+        "text": "#151515",
+        "muted": "rgba(0,0,0,0.68)",
+        "card": "rgba(255,255,255,0.92)",
+        "border": "rgba(0,0,0,0.12)",
+        "input_bg": "#ffffff",
+        "input_text": "#111111",
+        "emoji": "🎞️",
+    },
+    "Romance": {
+        "bg1": "#ffe5ee",
+        "bg2": "#fff9fb",
+        "accent": "#ff4d6d",
+        "text": "#151515",
+        "muted": "rgba(0,0,0,0.68)",
+        "card": "rgba(255,255,255,0.93)",
+        "border": "rgba(0,0,0,0.10)",
+        "input_bg": "#ffffff",
+        "input_text": "#111111",
+        "emoji": "💕",
+    },
+    "Science-fiction": {
+        "bg1": "#06111f",
+        "bg2": "#13233f",
+        "accent": "#00d4ff",
+        "text": "#f6fbff",
+        "muted": "rgba(255,255,255,0.80)",
+        "card": "rgba(255,255,255,0.10)",
+        "border": "rgba(255,255,255,0.18)",
+        "input_bg": "rgba(255,255,255,0.14)",
+        "input_text": "#ffffff",
+        "emoji": "🚀",
+    },
+    "Horreur": {
+        "bg1": "#0a0a0a",
+        "bg2": "#1c0d11",
+        "accent": "#ff0033",
+        "text": "#fff7f8",
+        "muted": "rgba(255,255,255,0.80)",
+        "card": "rgba(255,255,255,0.09)",
+        "border": "rgba(255,255,255,0.16)",
+        "input_bg": "rgba(255,255,255,0.14)",
+        "input_text": "#ffffff",
+        "emoji": "🩸",
+    },
+    "Été": {
+        "bg1": "#fff1c7",
+        "bg2": "#fffdf6",
+        "accent": "#ffb703",
+        "text": "#151515",
+        "muted": "rgba(0,0,0,0.68)",
+        "card": "rgba(255,255,255,0.94)",
+        "border": "rgba(0,0,0,0.10)",
+        "input_bg": "#ffffff",
+        "input_text": "#111111",
+        "emoji": "☀️",
+    },
+    "Halloween": {
+        "bg1": "#140c20",
+        "bg2": "#291938",
+        "accent": "#ff7a00",
+        "text": "#fff8f2",
+        "muted": "rgba(255,255,255,0.80)",
+        "card": "rgba(255,255,255,0.10)",
+        "border": "rgba(255,255,255,0.16)",
+        "input_bg": "rgba(255,255,255,0.14)",
+        "input_text": "#ffffff",
+        "emoji": "🎃",
+    },
+    "Armistice": {
+        "bg1": "#0c1629",
+        "bg2": "#163152",
+        "accent": "#3a86ff",
+        "text": "#f5f9ff",
+        "muted": "rgba(255,255,255,0.80)",
+        "card": "rgba(255,255,255,0.10)",
+        "border": "rgba(255,255,255,0.16)",
+        "input_bg": "rgba(255,255,255,0.14)",
+        "input_text": "#ffffff",
+        "emoji": "🇫🇷",
+    },
+    "Fête des mères": {
+        "bg1": "#fff0ea",
+        "bg2": "#fffdfb",
+        "accent": "#ff7aa2",
+        "text": "#151515",
+        "muted": "rgba(0,0,0,0.68)",
+        "card": "rgba(255,255,255,0.94)",
+        "border": "rgba(0,0,0,0.10)",
+        "input_bg": "#ffffff",
+        "input_text": "#111111",
+        "emoji": "🌷",
+    },
+    "Printemps": {
+        "bg1": "#e7f5e7",
+        "bg2": "#fafffa",
+        "accent": "#4caf50",
+        "text": "#151515",
+        "muted": "rgba(0,0,0,0.68)",
+        "card": "rgba(255,255,255,0.94)",
+        "border": "rgba(0,0,0,0.10)",
+        "input_bg": "#ffffff",
+        "input_text": "#111111",
+        "emoji": "🌿",
+    },
+}
 
-# =========================================================
-# THEME BACKGROUND POSTER
-# =========================================================
+THEME_SEED_TITLES = {
+    "Cinéma vintage": ["Casablanca", "Vertigo", "The Godfather"],
+    "Romance": ["Titanic", "The Notebook", "La La Land"],
+    "Science-fiction": ["Interstellar", "The Matrix", "Blade Runner 2049"],
+    "Horreur": ["Halloween", "It", "The Shining"],
+    "Été": ["Mamma Mia!", "Jaws", "The Beach"],
+    "Halloween": ["Halloween", "Scream", "Beetlejuice"],
+    "Armistice": ["1917", "Dunkirk", "Saving Private Ryan"],
+    "Fête des mères": ["Little Women", "Mamma Mia!", "The Blind Side"],
+    "Printemps": ["Amélie", "Big Fish", "The Secret Garden"],
+}
+
+
+def choose_auto_theme_name() -> str:
+    today = date.today()
+
+    if (today.month == 10 and today.day >= 15) or (today.month == 11 and today.day == 1):
+        return "Halloween"
+    if today.month in (6, 7, 8):
+        return "Été"
+    if today.month in (3, 4, 5):
+        return "Printemps"
+    if today.month == 2 and 10 <= today.day <= 15:
+        return "Romance"
+    if today.month == 11 and 8 <= today.day <= 12:
+        return "Armistice"
+
+    mothers_day = last_sunday_of_may(today.year)
+    if mothers_day - timedelta(days=6) <= today <= mothers_day + timedelta(days=1):
+        return "Fête des mères"
+
+    pool = ["Cinéma vintage", "Romance", "Science-fiction", "Horreur", "Été"]
+    return pool[today.toordinal() % len(pool)]
+
+
 @st.cache_data(show_spinner=False, ttl=86400)
 def get_theme_background_poster(theme_name: str, country: str, lang: str):
     seed_titles = THEME_SEED_TITLES.get(theme_name, [])
@@ -825,6 +577,197 @@ def get_theme_background_poster(theme_name: str, country: str, lang: str):
             continue
     return ""
 
+
+def apply_theme(theme_name: str, poster_url: str = "") -> str:
+    theme_name = choose_auto_theme_name()
+    theme = THEMES[theme_name]
+    bg_css = (
+        f'linear-gradient(180deg, rgba(0,0,0,0.30), rgba(0,0,0,0.60)), url("{poster_url}")'
+        if poster_url
+        else f'linear-gradient(180deg, {theme["bg1"]} 0%, {theme["bg2"]} 100%)'
+    )
+
+    st.markdown(
+        f"""
+        <style>
+        :root {{
+            color-scheme: light !important;
+        }}
+
+        html, body, .stApp, [data-testid="stAppViewContainer"] {{
+            background-image: {bg_css} !important;
+            background-size: cover !important;
+            background-position: center center !important;
+            background-attachment: fixed !important;
+            color: {theme["text"]} !important;
+        }}
+
+        [data-testid="stAppViewContainer"]::before {{
+            content:"";
+            position: fixed;
+            inset: 0;
+            pointer-events:none;
+            background:
+                repeating-linear-gradient(
+                    0deg,
+                    rgba(255,255,255,0.015),
+                    rgba(255,255,255,0.015) 1px,
+                    rgba(0,0,0,0.015) 2px,
+                    rgba(0,0,0,0.015) 3px
+                );
+            opacity: 0.10;
+            z-index: 0;
+        }}
+
+        .main .block-container {{
+            position: relative;
+            z-index: 1;
+            max-width: 1360px !important;
+            margin: 12px auto !important;
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            padding: 12px 12px 24px 12px !important;
+        }}
+
+        [data-testid="stSidebar"] > div:first-child {{
+            background: rgba(255,255,255,0.90) !important;
+            border-right: 1px solid rgba(0,0,0,0.08) !important;
+        }}
+
+        [data-testid="stMarkdownContainer"],
+        [data-testid="stMarkdownContainer"] * {{
+            color: {theme["text"]} !important;
+        }}
+
+        label, p, span, small {{
+            color: {theme["text"]} !important;
+        }}
+
+        .ff-panel {{
+            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,248,248,0.94));
+            border: 1px solid rgba(220,220,220,0.95);
+            border-radius: 16px;
+            padding: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+            color: #111111 !important;
+        }}
+
+        .ff-muted {{
+            color: rgba(0,0,0,0.72) !important;
+            font-size: 13px;
+        }}
+
+        .ff-pilllabel {{
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 10px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,244,244,0.96));
+            color: #111111 !important;
+            border: 1px solid rgba(220,220,220,0.95);
+            margin-bottom: 6px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.10);
+            font-size: 13px;
+            font-weight: 600;
+        }}
+
+        input, textarea {{
+            background: {theme["input_bg"]} !important;
+            color: {theme["input_text"]} !important;
+            border: 1px solid rgba(220,220,220,0.95) !important;
+            border-radius: 12px !important;
+        }}
+
+        [data-baseweb="select"] > div {{
+            background: {theme["input_bg"]} !important;
+            color: {theme["input_text"]} !important;
+            border: 1px solid rgba(220,220,220,0.95) !important;
+            border-radius: 12px !important;
+        }}
+
+        [data-baseweb="select"] * {{
+            color: {theme["input_text"]} !important;
+        }}
+
+        .stButton > button,
+        .stFormSubmitButton > button {{
+            background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(242,242,242,0.96)) !important;
+            color: #111111 !important;
+            border: 1px solid #d9d9d9 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.10);
+            font-weight: 600 !important;
+        }}
+
+        .ff-card {{
+            border: 1px solid rgba(220,220,220,0.95);
+            background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(248,248,248,0.95));
+            border-radius: 16px;
+            padding: 12px;
+            margin-top: 10px;
+            box-shadow: 0 10px 22px rgba(0,0,0,0.12);
+        }}
+
+        .ff-linkbox {{
+            display: inline-block;
+            padding: 4px 8px;
+            margin: 3px 4px 3px 0;
+            background: rgba(255,255,255,0.98);
+            border: 1px solid #e3e3e3;
+            border-radius: 10px;
+            color: #111111 !important;
+            text-decoration: none !important;
+        }}
+
+        .ff-stars {{
+            position: relative;
+            display: inline-block;
+            font-size: 16px;
+            line-height: 1;
+            letter-spacing: 1px;
+        }}
+
+        .ff-stars .bot {{
+            color: #d0d0d0;
+            display: block;
+        }}
+
+        .ff-stars .top {{
+            color: {theme["accent"]};
+            position: absolute;
+            left: 0;
+            top: 0;
+            overflow: hidden;
+            white-space: nowrap;
+            display: block;
+        }}
+
+        .ff-x-holder {{
+            margin-left: -48px;
+            z-index: 10;
+            position: relative;
+            top: 2px;
+        }}
+
+        .ff-x-holder button {{
+            width: 38px !important;
+            min-width: 38px !important;
+            min-height: 34px !important;
+            height: 34px !important;
+            border-radius: 10px !important;
+            padding: 0 !important;
+            font-size: 18px !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    return theme_name
+
+
+ACTIVE_THEME_NAME = choose_auto_theme_name()
+ACTIVE_THEME_POSTER = get_theme_background_poster(ACTIVE_THEME_NAME, profile.get("country", "fr"), profile.get("lang", "fr"))
+ACTIVE_THEME_NAME = apply_theme(ACTIVE_THEME_NAME, ACTIVE_THEME_POSTER)
 
 # =========================================================
 # BANDE-ANNONCE DIRECTE
@@ -863,7 +806,6 @@ def trailer_direct_url(title: str, year=None):
         return ""
 
     return ""
-
 
 # =========================================================
 # OLLAMA INTERNE
@@ -920,7 +862,6 @@ JSON:
         }
     except Exception:
         return {"entities": [], "queries": []}
-
 
 # =========================================================
 # SEARCH LOGIC
@@ -1082,7 +1023,6 @@ def build_raw_items(story: str, actor: str, mode: str, prof: dict, show_types: l
                 source_country[sid] = ctry
         return shows
 
-    # titre exact + alias d'abord
     if story:
         for title_candidate in exact_alias_titles(story):
             for stype in show_types:
@@ -1127,8 +1067,7 @@ def build_raw_items(story: str, actor: str, mode: str, prof: dict, show_types: l
 
     raw = []
     for show in shows:
-        sid = stable_id(show)
-        discovered_in = source_country.get(sid, country)
+        discovered_in = source_country.get(stable_id(show), country)
 
         year = show.get("releaseYear") or show.get("firstAirYear") or None
         try:
@@ -1223,7 +1162,6 @@ def apply_filters_and_sort(items, sort_mode, only_my_apps, platform_filter, year
 
     return out
 
-
 # =========================================================
 # SESSION
 # =========================================================
@@ -1240,7 +1178,6 @@ st.session_state.setdefault("open_details_id", None)
 st.session_state.setdefault("scroll_to_results", False)
 st.session_state.setdefault("restore_card_id", None)
 
-# acteur cliqué
 qp = get_query_params()
 if "actor" in qp:
     val = qp.get("actor")
@@ -1253,7 +1190,6 @@ if "actor" in qp:
     st.session_state["did_enter"] = True
     st.session_state["page"] = "Recherche"
     st.session_state["auto_search"] = True
-
 
 # =========================================================
 # SIDEBAR
@@ -1274,49 +1210,101 @@ with st.sidebar:
 page = st.session_state["page"]
 
 # =========================================================
-# ACCUEIL
+# HELPERS UI
 # =========================================================
-if page == "Accueil":
-    st.markdown("# FilmFinder IA")
-
-    actual_theme = ACTIVE_THEME_NAME
-    emoji = THEMES[actual_theme]["emoji"]
-    hero_poster = get_theme_background_poster(actual_theme, profile.get("country", "fr"), profile.get("lang", "fr"))
-    hero_style = f"background-image:url('{hero_poster}');" if hero_poster else ""
-
+def hero_block(theme_name: str, country: str, lang: str, subtitle: str):
+    poster = get_theme_background_poster(theme_name, country, lang)
+    emoji = THEMES[theme_name]["emoji"]
+    style = f"background-image:url('{poster}');" if poster else ""
     st.markdown(
         f"""
-        <div class="ff-hero">
-            <div class="ff-hero-bg" style="{hero_style}"></div>
-            <div class="ff-hero-overlay"></div>
-            <div class="ff-hero-content">
-                <div class="ff-hero-title">{emoji} Thème actif : {actual_theme}</div>
-                <div class="ff-hero-sub">Choisis tes plateformes une fois, puis entre.</div>
+        <div class="ff-panel" style="padding:0; overflow:hidden; background:transparent; border:none; box-shadow:none;">
+            <div style="
+                position:relative;
+                min-height:220px;
+                border-radius:18px;
+                overflow:hidden;
+                box-shadow:0 12px 26px rgba(0,0,0,0.18);
+                border:1px solid rgba(255,255,255,0.55);
+            ">
+                <div style="
+                    position:absolute; inset:0;
+                    {style}
+                    background-size:cover;
+                    background-position:center;
+                    transform:scale(1.03);
+                "></div>
+                <div style="
+                    position:absolute; inset:0;
+                    background:
+                        linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.66));
+                "></div>
+                <div style="
+                    position:relative;
+                    z-index:2;
+                    padding:18px;
+                    min-height:220px;
+                    display:flex;
+                    align-items:flex-end;
+                ">
+                    <div style="
+                        background:linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95));
+                        color:#111;
+                        padding:12px 14px;
+                        border-radius:16px;
+                        max-width:720px;
+                        border:1px solid rgba(220,220,220,0.95);
+                        box-shadow:0 6px 18px rgba(0,0,0,0.14);
+                    ">
+                        <div style="font-size:28px; font-weight:800; margin-bottom:4px;">
+                            {emoji} Thème actif : {theme_name}
+                        </div>
+                        <div style="font-size:14px;">
+                            {subtitle}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+
+def pill_label(text: str):
+    st.markdown(f'<div class="ff-pilllabel">{text}</div>', unsafe_allow_html=True)
+
+# =========================================================
+# ACCUEIL
+# =========================================================
+if page == "Accueil":
+    st.markdown("# FilmFinder IA")
+    hero_block(ACTIVE_THEME_NAME, profile.get("country", "fr"), profile.get("lang", "fr"), "Choisis tes plateformes une fois, puis entre.")
+
     if not RAPIDAPI_KEY:
         st.error("RAPIDAPI_KEY manquante dans .env")
         st.stop()
 
     with st.form("welcome_profile"):
-        c1, c2 = st.columns(2)
-        with c1:
+        left, right = st.columns(2)
+        with left:
+            pill_label("Pays")
             country = st.selectbox(
                 "Pays",
                 ["fr", "be", "ch", "gb", "us"],
                 index=["fr", "be", "ch", "gb", "us"].index(profile.get("country", "fr")),
+                label_visibility="collapsed",
             )
-        with c2:
+        with right:
+            pill_label("Langue")
             lang = st.selectbox(
                 "Langue",
                 ["fr", "en"],
                 index=["fr", "en"].index(profile.get("lang", "fr")),
+                label_visibility="collapsed",
             )
 
+        pill_label("Tes plateformes")
         services = get_services(country, lang)
         name_to_id = {
             (s.get("name") or s.get("id")): s.get("id")
@@ -1330,6 +1318,7 @@ if page == "Accueil":
             "Tes plateformes",
             options=sorted(name_to_id.keys()),
             default=sorted(set(default_names)),
+            label_visibility="collapsed",
         )
         platform_ids = [name_to_id[n] for n in chosen]
 
@@ -1354,23 +1343,28 @@ if page == "Accueil":
 # =========================================================
 if page == "Profil":
     st.markdown("# Profil")
-    st.caption("Modifie pays, langue et plateformes.")
+    hero_block(ACTIVE_THEME_NAME, profile.get("country", "fr"), profile.get("lang", "fr"), "Modifie pays, langue et plateformes.")
 
     with st.form("profile_form"):
-        c1, c2 = st.columns(2)
-        with c1:
+        left, right = st.columns(2)
+        with left:
+            pill_label("Pays")
             country = st.selectbox(
                 "Pays",
                 ["fr", "be", "ch", "gb", "us"],
                 index=["fr", "be", "ch", "gb", "us"].index(profile.get("country", "fr")),
+                label_visibility="collapsed",
             )
-        with c2:
+        with right:
+            pill_label("Langue")
             lang = st.selectbox(
                 "Langue",
                 ["fr", "en"],
                 index=["fr", "en"].index(profile.get("lang", "fr")),
+                label_visibility="collapsed",
             )
 
+        pill_label("Tes plateformes")
         services = get_services(country, lang)
         name_to_id = {
             (s.get("name") or s.get("id")): s.get("id")
@@ -1384,6 +1378,7 @@ if page == "Profil":
             "Tes plateformes",
             options=sorted(name_to_id.keys()),
             default=sorted(set(default_names)),
+            label_visibility="collapsed",
         )
         platform_ids = [name_to_id[n] for n in chosen]
 
@@ -1411,25 +1406,7 @@ if page == "Profil":
 # RECHERCHE
 # =========================================================
 st.markdown("# Recherche")
-
-actual_theme = ACTIVE_THEME_NAME
-emoji = THEMES[actual_theme]["emoji"]
-theme_poster = get_theme_background_poster(actual_theme, profile.get("country", "fr"), profile.get("lang", "fr"))
-hero_style = f"background-image:url('{theme_poster}');" if theme_poster else ""
-
-st.markdown(
-    f"""
-    <div class="ff-hero">
-        <div class="ff-hero-bg" style="{hero_style}"></div>
-        <div class="ff-hero-overlay"></div>
-        <div class="ff-hero-content">
-            <div class="ff-hero-title">{emoji} Thème actif : {actual_theme}</div>
-            <div class="ff-hero-sub">Recherche par histoire, souvenir, titre exact ou acteur.</div>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+hero_block(ACTIVE_THEME_NAME, profile.get("country", "fr"), profile.get("lang", "fr"), "Recherche par histoire, souvenir, titre exact ou acteur.")
 
 if not profile.get("platform_ids"):
     st.warning("Choisis au moins 1 plateforme dans Accueil/Profil.")
@@ -1437,22 +1414,22 @@ if not profile.get("platform_ids"):
     st.session_state["page"] = "Accueil"
     st.rerun()
 
-row_top1, row_top2 = st.columns(2)
-with row_top1:
+top_left, top_right = st.columns(2)
+with top_left:
+    pill_label("Je cherche")
     show_choice = st.selectbox(
-        "Je cherche :",
+        "Je cherche",
         ["Films", "Séries", "Films et séries"],
         key="show_choice",
+        label_visibility="collapsed",
     )
-with row_top2:
-    mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1)
+with top_right:
+    pill_label("Mode")
+    mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1, label_visibility="collapsed")
 
 show_types = showtype_to_list(show_choice)
 
-st.markdown(
-    "<div class='ff-muted'>Astuce • Acteur seul = OK • Clique acteur = films</div>",
-    unsafe_allow_html=True,
-)
+st.markdown("<div class='ff-panel ff-muted'>Astuce • Acteur seul = OK • Clique acteur = films</div>", unsafe_allow_html=True)
 
 
 def request_search():
@@ -1467,6 +1444,7 @@ def clear_actor():
     st.session_state["actor_input"] = ""
 
 
+pill_label("Histoire / souvenir / titre exact")
 c_story, c_x1 = st.columns([0.965, 0.035])
 with c_story:
     st.text_input(
@@ -1474,12 +1452,14 @@ with c_story:
         key="story_input",
         placeholder="Ex: Seul au monde ou un homme rescapé d'un crash avion sur une île déserte",
         on_change=request_search,
+        label_visibility="collapsed",
     )
 with c_x1:
     st.markdown('<div class="ff-x-holder">', unsafe_allow_html=True)
     st.button("✕", key="clear_story_btn", help="Effacer", on_click=clear_story)
     st.markdown("</div>", unsafe_allow_html=True)
 
+pill_label("Acteur/actrice (optionnel)")
 c_actor, c_x2 = st.columns([0.965, 0.035])
 with c_actor:
     st.text_input(
@@ -1487,6 +1467,7 @@ with c_actor:
         key="actor_input",
         placeholder="Ex: Tom Hanks",
         on_change=request_search,
+        label_visibility="collapsed",
     )
 with c_x2:
     st.markdown('<div class="ff-x-holder">', unsafe_allow_html=True)
@@ -1513,25 +1494,25 @@ story_suggest = prettify_sentence(fr_numbers_to_words(story_raw)) if story_raw e
 actor_suggest = titlecase_name(actor_raw) if actor_raw else ""
 
 if story_suggest and story_suggest != story_raw:
-    c1, c2 = st.columns([5, 1])
-    with c1:
+    left, right = st.columns([5, 1])
+    with left:
         st.markdown(
-            f"<div class='ff-muted'>Suggestion histoire : <b>{story_suggest}</b></div>",
+            f"<div class='ff-panel ff-muted'>Suggestion histoire : <b>{story_suggest}</b></div>",
             unsafe_allow_html=True,
         )
-    with c2:
+    with right:
         if st.button("Utiliser", key="use_story_fix"):
             st.session_state["story_input"] = story_suggest
             st.rerun()
 
 if actor_suggest and actor_suggest != actor_raw:
-    c1, c2 = st.columns([5, 1])
-    with c1:
+    left, right = st.columns([5, 1])
+    with left:
         st.markdown(
-            f"<div class='ff-muted'>Suggestion acteur : <b>{actor_suggest}</b></div>",
+            f"<div class='ff-panel ff-muted'>Suggestion acteur : <b>{actor_suggest}</b></div>",
             unsafe_allow_html=True,
         )
-    with c2:
+    with right:
         if st.button("Utiliser", key="use_actor_fix"):
             st.session_state["actor_input"] = actor_suggest
             st.rerun()
@@ -1549,29 +1530,33 @@ if auto or manual:
 
 raw_items = st.session_state.get("raw_items", [])
 
+pill_label("Trier / filtrer")
+f1, f2, f3 = st.columns(3)
+
 services = get_services(profile["country"], profile["lang"])
 id_to_name = {s.get("id"): (s.get("name") or s.get("id")) for s in services}
 platform_choices = ["Toutes"] + sorted(
     [id_to_name.get(i, i) for i in profile.get("platform_ids", [])]
 )
 
-sort_mode = "Pertinence"
-platform_filter = "Toutes"
-only_my_apps = False
-year_range = None
-
-f1, f2, f3 = st.columns(3)
 with f1:
     sort_mode = st.selectbox(
         "Trier par",
         ["Pertinence", "Année (récent)", "Année (ancien)", "Note (haute)"],
         index=0,
+        label_visibility="collapsed",
     )
 with f2:
-    platform_filter = st.selectbox("Plateforme", platform_choices, index=0)
+    platform_filter = st.selectbox(
+        "Plateforme",
+        platform_choices,
+        index=0,
+        label_visibility="collapsed",
+    )
 with f3:
     only_my_apps = st.checkbox("Seulement mes applis", value=False)
 
+year_range = None
 years = sorted({x["year"] for x in raw_items if x.get("year")})
 if years and min(years) != max(years):
     year_range = st.slider(
@@ -1583,15 +1568,17 @@ if years and min(years) != max(years):
 
 if not raw_items:
     st.markdown(
-        "<div class='ff-muted'>Tape une histoire, un titre exact ou un acteur puis Entrée / Chercher.</div>",
+        "<div class='ff-panel ff-muted'>Tape une histoire, un titre exact ou un acteur puis Entrée / Chercher.</div>",
         unsafe_allow_html=True,
     )
     st.stop()
 
 view = apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, year_range)
 
-st.markdown('<div id="first-film-anchor"></div>', unsafe_allow_html=True)
 st.write(f"✅ Résultats : {min(len(view), 20)} / {len(view)}")
+
+# ancre juste avant le premier film
+st.markdown('<div id="first-film-anchor"></div>', unsafe_allow_html=True)
 
 if st.session_state.pop("scroll_to_results", False):
     components.html(
