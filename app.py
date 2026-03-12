@@ -1,3 +1,4 @@
+import html
 import json
 import os
 import re
@@ -417,111 +418,66 @@ def pick_primary_option(opts: list):
 # =========================================================
 THEMES = {
     "Cinéma vintage": {
-        "bg1": "#e8dcc7",
-        "bg2": "#fff7ec",
         "accent": "#b85c38",
         "text": "#151515",
-        "muted": "rgba(0,0,0,0.68)",
-        "card": "rgba(255,255,255,0.92)",
-        "border": "rgba(0,0,0,0.12)",
-        "input_bg": "#ffffff",
-        "input_text": "#111111",
+        "muted": "rgba(0,0,0,0.72)",
+        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
         "emoji": "🎞️",
     },
     "Romance": {
-        "bg1": "#ffe5ee",
-        "bg2": "#fff9fb",
         "accent": "#ff4d6d",
         "text": "#151515",
-        "muted": "rgba(0,0,0,0.68)",
-        "card": "rgba(255,255,255,0.93)",
-        "border": "rgba(0,0,0,0.10)",
-        "input_bg": "#ffffff",
-        "input_text": "#111111",
+        "muted": "rgba(0,0,0,0.72)",
+        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
         "emoji": "💕",
     },
     "Science-fiction": {
-        "bg1": "#06111f",
-        "bg2": "#13233f",
         "accent": "#00d4ff",
-        "text": "#f6fbff",
-        "muted": "rgba(255,255,255,0.80)",
-        "card": "rgba(255,255,255,0.10)",
-        "border": "rgba(255,255,255,0.18)",
-        "input_bg": "rgba(255,255,255,0.14)",
-        "input_text": "#ffffff",
+        "text": "#151515",
+        "muted": "rgba(0,0,0,0.72)",
+        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
         "emoji": "🚀",
     },
     "Horreur": {
-        "bg1": "#0a0a0a",
-        "bg2": "#1c0d11",
         "accent": "#ff0033",
-        "text": "#fff7f8",
-        "muted": "rgba(255,255,255,0.80)",
-        "card": "rgba(255,255,255,0.09)",
-        "border": "rgba(255,255,255,0.16)",
-        "input_bg": "rgba(255,255,255,0.14)",
-        "input_text": "#ffffff",
+        "text": "#151515",
+        "muted": "rgba(0,0,0,0.72)",
+        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
         "emoji": "🩸",
     },
     "Été": {
-        "bg1": "#fff1c7",
-        "bg2": "#fffdf6",
         "accent": "#ffb703",
         "text": "#151515",
-        "muted": "rgba(0,0,0,0.68)",
-        "card": "rgba(255,255,255,0.94)",
-        "border": "rgba(0,0,0,0.10)",
-        "input_bg": "#ffffff",
-        "input_text": "#111111",
+        "muted": "rgba(0,0,0,0.72)",
+        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
         "emoji": "☀️",
     },
     "Halloween": {
-        "bg1": "#140c20",
-        "bg2": "#291938",
         "accent": "#ff7a00",
-        "text": "#fff8f2",
-        "muted": "rgba(255,255,255,0.80)",
-        "card": "rgba(255,255,255,0.10)",
-        "border": "rgba(255,255,255,0.16)",
-        "input_bg": "rgba(255,255,255,0.14)",
-        "input_text": "#ffffff",
+        "text": "#151515",
+        "muted": "rgba(0,0,0,0.72)",
+        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
         "emoji": "🎃",
     },
     "Armistice": {
-        "bg1": "#0c1629",
-        "bg2": "#163152",
         "accent": "#3a86ff",
-        "text": "#f5f9ff",
-        "muted": "rgba(255,255,255,0.80)",
-        "card": "rgba(255,255,255,0.10)",
-        "border": "rgba(255,255,255,0.16)",
-        "input_bg": "rgba(255,255,255,0.14)",
-        "input_text": "#ffffff",
+        "text": "#151515",
+        "muted": "rgba(0,0,0,0.72)",
+        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
         "emoji": "🇫🇷",
     },
     "Fête des mères": {
-        "bg1": "#fff0ea",
-        "bg2": "#fffdfb",
         "accent": "#ff7aa2",
         "text": "#151515",
-        "muted": "rgba(0,0,0,0.68)",
-        "card": "rgba(255,255,255,0.94)",
-        "border": "rgba(0,0,0,0.10)",
-        "input_bg": "#ffffff",
-        "input_text": "#111111",
+        "muted": "rgba(0,0,0,0.72)",
+        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
         "emoji": "🌷",
     },
     "Printemps": {
-        "bg1": "#e7f5e7",
-        "bg2": "#fafffa",
         "accent": "#4caf50",
         "text": "#151515",
-        "muted": "rgba(0,0,0,0.68)",
-        "card": "rgba(255,255,255,0.94)",
-        "border": "rgba(0,0,0,0.10)",
-        "input_bg": "#ffffff",
-        "input_text": "#111111",
+        "muted": "rgba(0,0,0,0.72)",
+        "panel_bg": "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95))",
         "emoji": "🌿",
     },
 }
@@ -537,6 +493,13 @@ THEME_SEED_TITLES = {
     "Fête des mères": ["Little Women", "Mamma Mia!", "The Blind Side"],
     "Printemps": ["Amélie", "Big Fish", "The Secret Garden"],
 }
+
+
+def last_sunday_of_may(year: int) -> date:
+    d = date(year, 5, 31)
+    while d.weekday() != 6:
+        d -= timedelta(days=1)
+    return d
 
 
 def choose_auto_theme_name() -> str:
@@ -578,195 +541,213 @@ def get_theme_background_poster(theme_name: str, country: str, lang: str):
     return ""
 
 
+def safe_css_url(url: str) -> str:
+    if not url:
+        return ""
+    return html.escape(url.replace('"', "%22").replace("'", "%27"), quote=True)
+
+
 def apply_theme(theme_name: str, poster_url: str = "") -> str:
-    theme_name = choose_auto_theme_name()
     theme = THEMES[theme_name]
-    bg_css = (
-        f'linear-gradient(180deg, rgba(0,0,0,0.30), rgba(0,0,0,0.60)), url("{poster_url}")'
-        if poster_url
-        else f'linear-gradient(180deg, {theme["bg1"]} 0%, {theme["bg2"]} 100%)'
+    safe_url = safe_css_url(poster_url)
+
+    css = """
+    <style>
+    :root {
+        color-scheme: light !important;
+    }
+
+    html, body, .stApp, [data-testid="stAppViewContainer"] {
+        color: __TEXT__ !important;
+    }
+
+    [data-testid="stAppViewContainer"] {
+        background-image: linear-gradient(180deg, rgba(0,0,0,0.20), rgba(0,0,0,0.55)), url("__POSTER__") !important;
+        background-size: cover !important;
+        background-position: center center !important;
+        background-attachment: fixed !important;
+    }
+
+    [data-testid="stAppViewContainer"]::before {
+        content:"";
+        position: fixed;
+        inset: 0;
+        pointer-events:none;
+        background:
+            repeating-linear-gradient(
+                0deg,
+                rgba(255,255,255,0.015),
+                rgba(255,255,255,0.015) 1px,
+                rgba(0,0,0,0.015) 2px,
+                rgba(0,0,0,0.015) 3px
+            );
+        opacity: 0.10;
+        z-index: 0;
+    }
+
+    .main .block-container {
+        position: relative;
+        z-index: 1;
+        max-width: 1360px !important;
+        margin: 12px auto !important;
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        padding: 12px 12px 24px 12px !important;
+    }
+
+    [data-testid="stSidebar"] > div:first-child {
+        background: rgba(255,255,255,0.90) !important;
+        border-right: 1px solid rgba(0,0,0,0.08) !important;
+    }
+
+    [data-testid="stMarkdownContainer"],
+    [data-testid="stMarkdownContainer"] * {
+        color: __TEXT__ !important;
+    }
+
+    label, p, span, small {
+        color: __TEXT__ !important;
+    }
+
+    .ff-panel {
+        background: __PANEL_BG__;
+        border: 1px solid rgba(220,220,220,0.95);
+        border-radius: 16px;
+        padding: 12px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        color: #111111 !important;
+    }
+
+    .ff-muted {
+        color: __MUTED__ !important;
+        font-size: 13px;
+    }
+
+    .ff-pilllabel {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,244,244,0.96));
+        color: #111111 !important;
+        border: 1px solid rgba(220,220,220,0.95);
+        margin-bottom: 6px;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.10);
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    input, textarea {
+        background: #ffffff !important;
+        color: #111111 !important;
+        border: 1px solid rgba(220,220,220,0.95) !important;
+        border-radius: 12px !important;
+    }
+
+    [data-baseweb="select"] > div {
+        background: #ffffff !important;
+        color: #111111 !important;
+        border: 1px solid rgba(220,220,220,0.95) !important;
+        border-radius: 12px !important;
+    }
+
+    [data-baseweb="select"] * {
+        color: #111111 !important;
+    }
+
+    .stButton > button,
+    .stFormSubmitButton > button {
+        background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(242,242,242,0.96)) !important;
+        color: #111111 !important;
+        border: 1px solid #d9d9d9 !important;
+        border-radius: 12px !important;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.10);
+        font-weight: 600 !important;
+    }
+
+    .stButton > button:hover,
+    .stFormSubmitButton > button:hover {
+        border-color: __ACCENT__ !important;
+    }
+
+    .ff-card {
+        border: 1px solid rgba(220,220,220,0.95);
+        background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(248,248,248,0.95));
+        border-radius: 16px;
+        padding: 12px;
+        margin-top: 10px;
+        box-shadow: 0 10px 22px rgba(0,0,0,0.12);
+    }
+
+    .ff-linkbox {
+        display: inline-block;
+        padding: 4px 8px;
+        margin: 3px 4px 3px 0;
+        background: rgba(255,255,255,0.98);
+        border: 1px solid #e3e3e3;
+        border-radius: 10px;
+        color: #111111 !important;
+        text-decoration: none !important;
+    }
+
+    .ff-stars {
+        position: relative;
+        display: inline-block;
+        font-size: 16px;
+        line-height: 1;
+        letter-spacing: 1px;
+    }
+
+    .ff-stars .bot {
+        color: #d0d0d0;
+        display: block;
+    }
+
+    .ff-stars .top {
+        color: __ACCENT__;
+        position: absolute;
+        left: 0;
+        top: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        display: block;
+    }
+
+    .ff-x-holder {
+        margin-left: -48px;
+        z-index: 10;
+        position: relative;
+        top: 2px;
+    }
+
+    .ff-x-holder button {
+        width: 38px !important;
+        min-width: 38px !important;
+        min-height: 34px !important;
+        height: 34px !important;
+        border-radius: 10px !important;
+        padding: 0 !important;
+        font-size: 18px !important;
+    }
+    </style>
+    """
+    css = (
+        css.replace("__TEXT__", theme["text"])
+        .replace("__POSTER__", safe_url)
+        .replace("__PANEL_BG__", theme["panel_bg"])
+        .replace("__MUTED__", theme["muted"])
+        .replace("__ACCENT__", theme["accent"])
     )
-
-    st.markdown(
-        f"""
-        <style>
-        :root {{
-            color-scheme: light !important;
-        }}
-
-        html, body, .stApp, [data-testid="stAppViewContainer"] {{
-            background-image: {bg_css} !important;
-            background-size: cover !important;
-            background-position: center center !important;
-            background-attachment: fixed !important;
-            color: {theme["text"]} !important;
-        }}
-
-        [data-testid="stAppViewContainer"]::before {{
-            content:"";
-            position: fixed;
-            inset: 0;
-            pointer-events:none;
-            background:
-                repeating-linear-gradient(
-                    0deg,
-                    rgba(255,255,255,0.015),
-                    rgba(255,255,255,0.015) 1px,
-                    rgba(0,0,0,0.015) 2px,
-                    rgba(0,0,0,0.015) 3px
-                );
-            opacity: 0.10;
-            z-index: 0;
-        }}
-
-        .main .block-container {{
-            position: relative;
-            z-index: 1;
-            max-width: 1360px !important;
-            margin: 12px auto !important;
-            background: transparent !important;
-            border: 0 !important;
-            box-shadow: none !important;
-            padding: 12px 12px 24px 12px !important;
-        }}
-
-        [data-testid="stSidebar"] > div:first-child {{
-            background: rgba(255,255,255,0.90) !important;
-            border-right: 1px solid rgba(0,0,0,0.08) !important;
-        }}
-
-        [data-testid="stMarkdownContainer"],
-        [data-testid="stMarkdownContainer"] * {{
-            color: {theme["text"]} !important;
-        }}
-
-        label, p, span, small {{
-            color: {theme["text"]} !important;
-        }}
-
-        .ff-panel {{
-            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,248,248,0.94));
-            border: 1px solid rgba(220,220,220,0.95);
-            border-radius: 16px;
-            padding: 12px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.12);
-            color: #111111 !important;
-        }}
-
-        .ff-muted {{
-            color: rgba(0,0,0,0.72) !important;
-            font-size: 13px;
-        }}
-
-        .ff-pilllabel {{
-            display: inline-block;
-            padding: 5px 10px;
-            border-radius: 10px;
-            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,244,244,0.96));
-            color: #111111 !important;
-            border: 1px solid rgba(220,220,220,0.95);
-            margin-bottom: 6px;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.10);
-            font-size: 13px;
-            font-weight: 600;
-        }}
-
-        input, textarea {{
-            background: {theme["input_bg"]} !important;
-            color: {theme["input_text"]} !important;
-            border: 1px solid rgba(220,220,220,0.95) !important;
-            border-radius: 12px !important;
-        }}
-
-        [data-baseweb="select"] > div {{
-            background: {theme["input_bg"]} !important;
-            color: {theme["input_text"]} !important;
-            border: 1px solid rgba(220,220,220,0.95) !important;
-            border-radius: 12px !important;
-        }}
-
-        [data-baseweb="select"] * {{
-            color: {theme["input_text"]} !important;
-        }}
-
-        .stButton > button,
-        .stFormSubmitButton > button {{
-            background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(242,242,242,0.96)) !important;
-            color: #111111 !important;
-            border: 1px solid #d9d9d9 !important;
-            border-radius: 12px !important;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.10);
-            font-weight: 600 !important;
-        }}
-
-        .ff-card {{
-            border: 1px solid rgba(220,220,220,0.95);
-            background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(248,248,248,0.95));
-            border-radius: 16px;
-            padding: 12px;
-            margin-top: 10px;
-            box-shadow: 0 10px 22px rgba(0,0,0,0.12);
-        }}
-
-        .ff-linkbox {{
-            display: inline-block;
-            padding: 4px 8px;
-            margin: 3px 4px 3px 0;
-            background: rgba(255,255,255,0.98);
-            border: 1px solid #e3e3e3;
-            border-radius: 10px;
-            color: #111111 !important;
-            text-decoration: none !important;
-        }}
-
-        .ff-stars {{
-            position: relative;
-            display: inline-block;
-            font-size: 16px;
-            line-height: 1;
-            letter-spacing: 1px;
-        }}
-
-        .ff-stars .bot {{
-            color: #d0d0d0;
-            display: block;
-        }}
-
-        .ff-stars .top {{
-            color: {theme["accent"]};
-            position: absolute;
-            left: 0;
-            top: 0;
-            overflow: hidden;
-            white-space: nowrap;
-            display: block;
-        }}
-
-        .ff-x-holder {{
-            margin-left: -48px;
-            z-index: 10;
-            position: relative;
-            top: 2px;
-        }}
-
-        .ff-x-holder button {{
-            width: 38px !important;
-            min-width: 38px !important;
-            min-height: 34px !important;
-            height: 34px !important;
-            border-radius: 10px !important;
-            padding: 0 !important;
-            font-size: 18px !important;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(css, unsafe_allow_html=True)
     return theme_name
 
 
 ACTIVE_THEME_NAME = choose_auto_theme_name()
-ACTIVE_THEME_POSTER = get_theme_background_poster(ACTIVE_THEME_NAME, profile.get("country", "fr"), profile.get("lang", "fr"))
+ACTIVE_THEME_POSTER = get_theme_background_poster(
+    ACTIVE_THEME_NAME,
+    profile.get("country", "fr"),
+    profile.get("lang", "fr"),
+)
 ACTIVE_THEME_NAME = apply_theme(ACTIVE_THEME_NAME, ACTIVE_THEME_POSTER)
 
 # =========================================================
@@ -969,10 +950,23 @@ def exact_title_match_score(title: str, query: str) -> int:
     q = norm_loose(query)
     if not t or not q:
         return 0
+
+    alias_titles = exact_alias_titles(query)
+    alias_norms = [norm_loose(x) for x in alias_titles]
+
     if t == q:
-        return 5
+        return 6
+
+    if t in alias_norms:
+        return 6
+
     if q in t or t in q:
         return 2
+
+    for alias in alias_norms:
+        if alias in t or t in alias:
+            return 2
+
     return 0
 
 
@@ -1023,6 +1017,7 @@ def build_raw_items(story: str, actor: str, mode: str, prof: dict, show_types: l
                 source_country[sid] = ctry
         return shows
 
+    # titre exact + alias en priorité absolue
     if story:
         for title_candidate in exact_alias_titles(story):
             for stype in show_types:
@@ -1210,58 +1205,60 @@ with st.sidebar:
 page = st.session_state["page"]
 
 # =========================================================
-# HELPERS UI
+# UI HELPERS
 # =========================================================
 def hero_block(theme_name: str, country: str, lang: str, subtitle: str):
     poster = get_theme_background_poster(theme_name, country, lang)
+    safe_url = safe_css_url(poster)
     emoji = THEMES[theme_name]["emoji"]
-    style = f"background-image:url('{poster}');" if poster else ""
+
     st.markdown(
         f"""
-        <div class="ff-panel" style="padding:0; overflow:hidden; background:transparent; border:none; box-shadow:none;">
+        <div style="
+            position:relative;
+            min-height:220px;
+            border-radius:18px;
+            overflow:hidden;
+            box-shadow:0 12px 26px rgba(0,0,0,0.18);
+            border:1px solid rgba(255,255,255,0.55);
+            margin-bottom:16px;
+        ">
+            <div style="
+                position:absolute;
+                inset:0;
+                background-image:url('{safe_url}');
+                background-size:cover;
+                background-position:center;
+                transform:scale(1.03);
+            "></div>
+            <div style="
+                position:absolute;
+                inset:0;
+                background:
+                    linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.66));
+            "></div>
             <div style="
                 position:relative;
+                z-index:2;
+                padding:18px;
                 min-height:220px;
-                border-radius:18px;
-                overflow:hidden;
-                box-shadow:0 12px 26px rgba(0,0,0,0.18);
-                border:1px solid rgba(255,255,255,0.55);
+                display:flex;
+                align-items:flex-end;
             ">
                 <div style="
-                    position:absolute; inset:0;
-                    {style}
-                    background-size:cover;
-                    background-position:center;
-                    transform:scale(1.03);
-                "></div>
-                <div style="
-                    position:absolute; inset:0;
-                    background:
-                        linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.66));
-                "></div>
-                <div style="
-                    position:relative;
-                    z-index:2;
-                    padding:18px;
-                    min-height:220px;
-                    display:flex;
-                    align-items:flex-end;
+                    background:linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95));
+                    color:#111;
+                    padding:12px 14px;
+                    border-radius:16px;
+                    max-width:720px;
+                    border:1px solid rgba(220,220,220,0.95);
+                    box-shadow:0 6px 18px rgba(0,0,0,0.14);
                 ">
-                    <div style="
-                        background:linear-gradient(180deg, rgba(255,255,255,0.97), rgba(246,246,246,0.95));
-                        color:#111;
-                        padding:12px 14px;
-                        border-radius:16px;
-                        max-width:720px;
-                        border:1px solid rgba(220,220,220,0.95);
-                        box-shadow:0 6px 18px rgba(0,0,0,0.14);
-                    ">
-                        <div style="font-size:28px; font-weight:800; margin-bottom:4px;">
-                            {emoji} Thème actif : {theme_name}
-                        </div>
-                        <div style="font-size:14px;">
-                            {subtitle}
-                        </div>
+                    <div style="font-size:28px; font-weight:800; margin-bottom:4px;">
+                        {emoji} Thème actif : {theme_name}
+                    </div>
+                    <div style="font-size:14px;">
+                        {subtitle}
                     </div>
                 </div>
             </div>
@@ -1576,8 +1573,6 @@ if not raw_items:
 view = apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, year_range)
 
 st.write(f"✅ Résultats : {min(len(view), 20)} / {len(view)}")
-
-# ancre juste avant le premier film
 st.markdown('<div id="first-film-anchor"></div>', unsafe_allow_html=True)
 
 if st.session_state.pop("scroll_to_results", False):
