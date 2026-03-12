@@ -23,6 +23,7 @@ RAPIDAPI_HOST = os.getenv(
 ).strip()
 BASE_URL = "https://streaming-availability.p.rapidapi.com"
 
+# IA locale optionnelle
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").strip()
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip()
 
@@ -37,108 +38,103 @@ st.set_page_config(page_title="FilmFinder IA", layout="centered")
 THEMES = {
     "Auto": {},
     "Cinéma vintage": {
-        "bg1": "#f7f1e1",
-        "bg2": "#ffffff",
+        "bg1": "#f5ebd7",
+        "bg2": "#fffaf2",
         "accent": "#b85c38",
         "text": "#111111",
         "muted": "rgba(0,0,0,0.65)",
-        "card": "#ffffff",
-        "border": "rgba(0,0,0,0.10)",
+        "card": "rgba(255,255,255,0.92)",
+        "border": "rgba(0,0,0,0.12)",
         "input_bg": "#ffffff",
         "input_text": "#111111",
-        "button_bg": "#ffffff",
-        "button_text": "#111111",
     },
     "Romance": {
-        "bg1": "#fff0f3",
-        "bg2": "#ffffff",
+        "bg1": "#ffe8ef",
+        "bg2": "#fffafb",
         "accent": "#ff4d6d",
         "text": "#111111",
         "muted": "rgba(0,0,0,0.65)",
-        "card": "#ffffff",
+        "card": "rgba(255,255,255,0.93)",
         "border": "rgba(0,0,0,0.10)",
         "input_bg": "#ffffff",
         "input_text": "#111111",
-        "button_bg": "#ffffff",
-        "button_text": "#111111",
     },
     "Science-fiction": {
-        "bg1": "#0b1020",
-        "bg2": "#121a33",
+        "bg1": "#06111f",
+        "bg2": "#13233f",
         "accent": "#00d4ff",
-        "text": "#f3f7ff",
-        "muted": "rgba(255,255,255,0.72)",
+        "text": "#f7fbff",
+        "muted": "rgba(255,255,255,0.78)",
         "card": "rgba(255,255,255,0.10)",
         "border": "rgba(255,255,255,0.18)",
-        "input_bg": "rgba(255,255,255,0.12)",
+        "input_bg": "rgba(255,255,255,0.14)",
         "input_text": "#ffffff",
-        "button_bg": "#ffffff",
-        "button_text": "#111111",
     },
     "Horreur": {
-        "bg1": "#0a0a0a",
-        "bg2": "#1a1a1a",
+        "bg1": "#0b0b0b",
+        "bg2": "#1d0f12",
         "accent": "#ff0033",
-        "text": "#fff5f7",
-        "muted": "rgba(255,255,255,0.72)",
-        "card": "rgba(255,255,255,0.08)",
+        "text": "#fff7f8",
+        "muted": "rgba(255,255,255,0.78)",
+        "card": "rgba(255,255,255,0.09)",
         "border": "rgba(255,255,255,0.16)",
-        "input_bg": "rgba(255,255,255,0.12)",
+        "input_bg": "rgba(255,255,255,0.14)",
         "input_text": "#ffffff",
-        "button_bg": "#ffffff",
-        "button_text": "#111111",
     },
     "Été": {
-        "bg1": "#fff7e6",
-        "bg2": "#ffffff",
+        "bg1": "#fff2cc",
+        "bg2": "#fffdf5",
         "accent": "#ffb703",
         "text": "#111111",
         "muted": "rgba(0,0,0,0.65)",
-        "card": "#ffffff",
+        "card": "rgba(255,255,255,0.94)",
         "border": "rgba(0,0,0,0.10)",
         "input_bg": "#ffffff",
         "input_text": "#111111",
-        "button_bg": "#ffffff",
-        "button_text": "#111111",
     },
     "Halloween": {
-        "bg1": "#120b1f",
-        "bg2": "#1c1230",
+        "bg1": "#130c1f",
+        "bg2": "#261631",
         "accent": "#ff7a00",
         "text": "#fff8f2",
-        "muted": "rgba(255,255,255,0.72)",
-        "card": "rgba(255,255,255,0.09)",
-        "border": "rgba(255,255,255,0.16)",
-        "input_bg": "rgba(255,255,255,0.12)",
-        "input_text": "#ffffff",
-        "button_bg": "#ffffff",
-        "button_text": "#111111",
-    },
-    "Armistice": {
-        "bg1": "#102038",
-        "bg2": "#1b2b45",
-        "accent": "#3a86ff",
-        "text": "#f5f9ff",
-        "muted": "rgba(255,255,255,0.72)",
+        "muted": "rgba(255,255,255,0.78)",
         "card": "rgba(255,255,255,0.10)",
         "border": "rgba(255,255,255,0.16)",
-        "input_bg": "rgba(255,255,255,0.12)",
+        "input_bg": "rgba(255,255,255,0.14)",
         "input_text": "#ffffff",
-        "button_bg": "#ffffff",
-        "button_text": "#111111",
+    },
+    "Armistice": {
+        "bg1": "#0c1629",
+        "bg2": "#163152",
+        "accent": "#3a86ff",
+        "text": "#f5f9ff",
+        "muted": "rgba(255,255,255,0.78)",
+        "card": "rgba(255,255,255,0.10)",
+        "border": "rgba(255,255,255,0.16)",
+        "input_bg": "rgba(255,255,255,0.14)",
+        "input_text": "#ffffff",
     },
     "Fête des mères": {
-        "bg1": "#fff4e8",
-        "bg2": "#ffffff",
+        "bg1": "#fff0ea",
+        "bg2": "#fffdfb",
         "accent": "#ff7aa2",
         "text": "#111111",
         "muted": "rgba(0,0,0,0.65)",
-        "card": "#ffffff",
+        "card": "rgba(255,255,255,0.94)",
         "border": "rgba(0,0,0,0.10)",
         "input_bg": "#ffffff",
         "input_text": "#111111",
-        "button_bg": "#ffffff",
-        "button_text": "#111111",
+    },
+    "Printemps": {
+        "bg1": "#eef9ef",
+        "bg2": "#fbfffb",
+        "accent": "#4caf50",
+        "text": "#111111",
+        "muted": "rgba(0,0,0,0.65)",
+        "card": "rgba(255,255,255,0.94)",
+        "border": "rgba(0,0,0,0.10)",
+        "input_bg": "#ffffff",
+        "input_text": "#111111",
     },
 }
 
@@ -157,6 +153,8 @@ def choose_auto_theme_name() -> str:
         return "Halloween"
     if today.month in (6, 7, 8):
         return "Été"
+    if today.month in (3, 4, 5):
+        return "Printemps"
     if today.month == 2 and 10 <= today.day <= 15:
         return "Romance"
     if today.month == 11 and 8 <= today.day <= 12:
@@ -166,9 +164,8 @@ def choose_auto_theme_name() -> str:
     if mothers_day - timedelta(days=6) <= today <= mothers_day + timedelta(days=1):
         return "Fête des mères"
 
-    return random.choice(
-        ["Cinéma vintage", "Romance", "Science-fiction", "Horreur", "Été"]
-    )
+    pool = ["Cinéma vintage", "Romance", "Science-fiction", "Horreur", "Été"]
+    return pool[today.toordinal() % len(pool)]
 
 
 def apply_theme(theme_name: str) -> None:
@@ -185,7 +182,7 @@ def apply_theme(theme_name: str) -> None:
         }}
 
         html, body, .stApp, [data-testid="stAppViewContainer"] {{
-            background: linear-gradient(180deg, {theme["bg1"]} 0%, {theme["bg2"]} 60%, {theme["bg2"]} 100%) !important;
+            background: linear-gradient(180deg, {theme["bg1"]} 0%, {theme["bg2"]} 62%, {theme["bg2"]} 100%) !important;
             color: {theme["text"]} !important;
         }}
 
@@ -195,14 +192,14 @@ def apply_theme(theme_name: str) -> None:
             inset: 0;
             pointer-events:none;
             background:
-                radial-gradient(circle at 18% 10%, rgba(255,255,255,0.05), transparent 35%),
-                radial-gradient(circle at 80% 22%, rgba(255,255,255,0.04), transparent 40%),
+                radial-gradient(circle at 20% 12%, rgba(255,255,255,0.08), transparent 30%),
+                radial-gradient(circle at 82% 26%, rgba(255,255,255,0.05), transparent 34%),
                 repeating-linear-gradient(
                     0deg,
-                    rgba(255,255,255,0.02),
-                    rgba(255,255,255,0.02) 1px,
-                    rgba(0,0,0,0.02) 2px,
-                    rgba(0,0,0,0.02) 3px
+                    rgba(255,255,255,0.015),
+                    rgba(255,255,255,0.015) 1px,
+                    rgba(0,0,0,0.015) 2px,
+                    rgba(0,0,0,0.015) 3px
                 );
             opacity: 0.12;
             mix-blend-mode: overlay;
@@ -218,11 +215,17 @@ def apply_theme(theme_name: str) -> None:
             border: 1px solid {theme["border"]} !important;
             border-radius: 18px !important;
             padding: 16px 18px 24px 18px !important;
-            box-shadow: 0 14px 40px rgba(0,0,0,0.12) !important;
+            box-shadow: 0 16px 42px rgba(0,0,0,0.12) !important;
             backdrop-filter: blur(10px);
         }}
 
-        [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] * {{
+        [data-testid="stSidebar"] > div:first-child {{
+            background: {theme["card"]} !important;
+            border-right: 1px solid {theme["border"]} !important;
+        }}
+
+        [data-testid="stMarkdownContainer"],
+        [data-testid="stMarkdownContainer"] * {{
             color: {theme["text"]} !important;
         }}
 
@@ -253,15 +256,18 @@ def apply_theme(theme_name: str) -> None:
             color: {theme["input_text"]} !important;
         }}
 
-        .stButton > button, .stFormSubmitButton > button {{
-            background: {theme["button_bg"]} !important;
-            color: {theme["button_text"]} !important;
+        .stButton > button,
+        .stFormSubmitButton > button {{
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(242,242,242,0.95)) !important;
+            color: #111111 !important;
             border: 1px solid #d9d9d9 !important;
             border-radius: 12px !important;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.10);
+            font-weight: 600 !important;
         }}
 
-        .stButton > button:hover, .stFormSubmitButton > button:hover {{
+        .stButton > button:hover,
+        .stFormSubmitButton > button:hover {{
             border-color: {theme["accent"]} !important;
         }}
 
@@ -274,15 +280,15 @@ def apply_theme(theme_name: str) -> None:
             box-shadow: 0 10px 22px rgba(0,0,0,0.08);
         }}
 
-        .ff-linkbox a {{
+        .ff-linkbox {{
             display: inline-block;
-            padding: 2px 6px;
-            margin: 2px 2px 2px 0;
-            background: rgba(255,255,255,0.92);
-            border: 1px solid #e4e4e4;
-            border-radius: 8px;
+            padding: 4px 8px;
+            margin: 3px 4px 3px 0;
+            background: rgba(255,255,255,0.97);
+            border: 1px solid #e3e3e3;
+            border-radius: 10px;
             color: #111111 !important;
-            text-decoration: none;
+            text-decoration: none !important;
         }}
 
         .ff-stars {{
@@ -310,13 +316,10 @@ def apply_theme(theme_name: str) -> None:
 
         .ff-x-btn button {{
             width: 100%;
-            padding: 0.28rem 0.6rem !important;
-            min-height: 0 !important;
+            padding: 0.30rem 0.5rem !important;
+            min-height: 38px !important;
             line-height: 1 !important;
-        }}
-
-        [data-testid="stExpander"] {{
-            border-radius: 14px !important;
+            font-size: 18px !important;
         }}
         </style>
         """,
@@ -342,7 +345,10 @@ def load_profile() -> dict:
 
 
 def save_profile(profile: dict) -> None:
-    PROFILE_PATH.write_text(json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
+    PROFILE_PATH.write_text(
+        json.dumps(profile, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 profile = load_profile()
@@ -391,6 +397,7 @@ SYNONYMS = {
     "rescapé": ["survivor"],
     "naufrage": ["castaway", "survivor"],
     "naufragé": ["castaway", "survivor"],
+    "perdu": ["lost"],
 }
 
 RULE_HINTS = [
@@ -399,11 +406,22 @@ RULE_HINTS = [
         "add_entities": ["Hulk", "The Incredible Hulk", "Green Lantern"],
     },
     {
-        "if_any": ["seul au monde", "cast away", "crash avion ile", "crash avion île", "survivant avion ile", "survivant avion île", "homme seul ile", "île déserte crash avion"],
+        "if_any": [
+            "seul au monde",
+            "cast away",
+            "crash avion ile",
+            "crash avion île",
+            "survivant avion ile",
+            "survivant avion île",
+            "homme seul ile",
+            "homme seul île",
+            "ile deserte crash avion",
+            "île déserte crash avion",
+        ],
         "add_entities": ["Seul au monde", "Cast Away"],
     },
     {
-        "if_any": ["a nous 4", "à nous 4", "a nous quatre", "à nous quatre", "jumelles separees naissance", "jumelles séparées naissance", "twins separated birth"],
+        "if_any": ["a nous 4", "à nous 4", "a nous quatre", "à nous quatre", "jumelles separees naissance", "jumelles séparées naissance"],
         "add_entities": ["À nous quatre", "The Parent Trap"],
     },
     {
@@ -535,7 +553,7 @@ def clear_query_params() -> None:
 
 
 # =========================================================
-# API
+# RAPIDAPI
 # =========================================================
 def sa_get(path: str, params: dict) -> dict:
     if not RAPIDAPI_KEY:
@@ -689,8 +707,15 @@ def pick_primary_option(opts: list):
     return opts[0], opts[1:]
 
 
+def trailer_search_url(title: str, year=None):
+    if not title:
+        return ""
+    query = f"{title} {year if year else ''} bande annonce trailer"
+    return f"https://www.youtube.com/results?search_query={quote(query)}"
+
+
 # =========================================================
-# OLLAMA (INTERNE, PAS AFFICHÉ)
+# OLLAMA INTERNE
 # =========================================================
 @st.cache_data(show_spinner=False, ttl=3600)
 def ollama_infer_entities(story: str, actor: str):
@@ -705,6 +730,7 @@ Réponds UNIQUEMENT en JSON strict :
 
 - entities: 3 à 8 titres/franchises/personnages probables
 - queries: 4 à 8 requêtes courtes FR+EN
+
 Souvenir: {story}
 Acteur: {actor}
 JSON:
@@ -870,28 +896,27 @@ def build_raw_items(story: str, actor: str, mode: str, prof: dict, show_types: l
     found = []
     source_country = {}
 
-    def add_chunk(ctry: str, show_type: str, shows: list):
+    def add_chunk(ctry: str, shows: list):
         for show in shows:
             sid = stable_id(show)
             if sid not in source_country:
                 source_country[sid] = ctry
         return shows
 
-    # 1) titre exact d'abord
+    # titre exact d'abord
     if story:
         for stype in show_types:
             exact = search_by_title(country, stype, lang, story)
             if exact:
-                found += add_chunk(country, stype, exact)
+                found += add_chunk(country, exact)
 
-    # 2) variantes / synopsis
     variants = build_query_variants(story, actor, mode)[: pre["variants_max"]]
 
+    # recherche mots-clés
     for stype in show_types:
         for kw in variants:
             found += add_chunk(
                 country,
-                stype,
                 collect_shows(
                     country,
                     stype,
@@ -904,33 +929,17 @@ def build_raw_items(story: str, actor: str, mode: str, prof: dict, show_types: l
             if len(found) >= pre["pool"]:
                 break
 
-    # 3) fallback US/GB si peu de résultats
+    # fallback us/gb si peu
     if len(found) < 12:
         for stype in show_types:
             for kw in variants[: min(4, len(variants))]:
                 found += add_chunk(
                     "us",
-                    stype,
-                    collect_shows(
-                        "us",
-                        stype,
-                        lang,
-                        kw,
-                        max_items=pre["pool"],
-                        max_pages=1,
-                    ),
+                    collect_shows("us", stype, lang, kw, max_items=pre["pool"], max_pages=1),
                 )
                 found += add_chunk(
                     "gb",
-                    stype,
-                    collect_shows(
-                        "gb",
-                        stype,
-                        lang,
-                        kw,
-                        max_items=pre["pool"],
-                        max_pages=1,
-                    ),
+                    collect_shows("gb", stype, lang, kw, max_items=pre["pool"], max_pages=1),
                 )
 
     shows = merge_results(found)
@@ -973,7 +982,6 @@ def build_raw_items(story: str, actor: str, mode: str, prof: dict, show_types: l
                 "score100": score100,
                 "opts_all": opts_all,
                 "is_mine": 1 if opts_mine else 0,
-                "discovered_in": discovered_in,
                 "rel": relevance_score(show, user_text) + (0.25 * (1 if opts_mine else 0)),
             }
         )
@@ -992,7 +1000,7 @@ def apply_filters_and_sort(items, sort_mode, only_my_apps, platform_filter, year
     if platform_filter != "Toutes":
         def ok_platform(item):
             for opt in item["opts_all"]:
-                svc = (opt.get("service") or {})
+                svc = opt.get("service") or {}
                 name = (svc.get("name") or svc.get("id") or "").strip()
                 if name == platform_filter:
                     return True
@@ -1030,7 +1038,7 @@ st.session_state.setdefault("do_search_now", False)
 st.session_state.setdefault("open_details_id", None)
 st.session_state.setdefault("scroll_to_results", False)
 
-# acteur cliqué
+# clic acteur
 qp = get_query_params()
 if "actor" in qp:
     val = qp.get("actor")
@@ -1046,7 +1054,7 @@ if "actor" in qp:
 
 
 # =========================================================
-# NAV
+# SIDEBAR
 # =========================================================
 with st.sidebar:
     st.markdown("## FilmFinder IA")
@@ -1137,7 +1145,7 @@ if page == "Accueil":
 # =========================================================
 if page == "Profil":
     st.markdown("# Profil")
-    st.caption("Modifie pays / langue / plateformes.")
+    st.caption("Modifie pays, langue et plateformes.")
 
     with st.form("profile_form"):
         c1, c2 = st.columns(2)
@@ -1222,7 +1230,10 @@ show_choice = st.selectbox(
 show_types = showtype_to_list(show_choice)
 
 mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1)
-st.markdown("<div class='ff-muted'>Astuce • Acteur seul = OK • Clique acteur = films</div>", unsafe_allow_html=True)
+st.markdown(
+    "<div class='ff-muted'>Astuce • Acteur seul = OK • Clique acteur = films</div>",
+    unsafe_allow_html=True,
+)
 
 
 def request_search():
@@ -1237,18 +1248,17 @@ def clear_actor():
     st.session_state["actor_input"] = ""
 
 
-# champs + croix
 c_story, c_x1 = st.columns([0.88, 0.12])
 with c_story:
     st.text_input(
-        "Histoire / souvenir (optionnel)",
+        "Histoire / souvenir / titre exact",
         key="story_input",
-        placeholder="Ex: un homme rescapé d'un crash avion sur une île déserte",
+        placeholder="Ex: Seul au monde ou un homme rescapé d'un crash avion sur une île déserte",
         on_change=request_search,
     )
 with c_x1:
     st.markdown('<div class="ff-x-btn">', unsafe_allow_html=True)
-    st.button("✕", key="clear_story_btn", help="Effacer l'histoire", on_click=clear_story)
+    st.button("✕", key="clear_story_btn", help="Effacer", on_click=clear_story)
     st.markdown("</div>", unsafe_allow_html=True)
 
 c_actor, c_x2 = st.columns([0.88, 0.12])
@@ -1261,7 +1271,7 @@ with c_actor:
     )
 with c_x2:
     st.markdown('<div class="ff-x-btn">', unsafe_allow_html=True)
-    st.button("✕", key="clear_actor_btn", help="Effacer l'acteur", on_click=clear_actor)
+    st.button("✕", key="clear_actor_btn", help="Effacer", on_click=clear_actor)
     st.markdown("</div>", unsafe_allow_html=True)
 
 if st.button("Chercher", key="search_btn"):
@@ -1276,7 +1286,6 @@ def do_search(story_text: str, actor_text: str):
     st.session_state["scroll_to_results"] = True
 
 
-# suggestions discrètes
 story_raw = st.session_state.get("story_input", "").strip()
 actor_raw = st.session_state.get("actor_input", "").strip()
 
@@ -1320,7 +1329,6 @@ if auto or manual:
 
 raw_items = st.session_state.get("raw_items", [])
 
-# filtres
 services = get_services(profile["country"], profile["lang"])
 id_to_name = {s.get("id"): (s.get("name") or s.get("id")) for s in services}
 platform_choices = ["Toutes"] + sorted(
@@ -1356,14 +1364,13 @@ with st.expander("Filtres avancés…", expanded=False):
 
 if not raw_items:
     st.markdown(
-        "<div class='ff-muted'>Tape une histoire, un titre ou un acteur puis Entrée / Chercher.</div>",
+        "<div class='ff-muted'>Tape une histoire, un titre exact ou un acteur puis Entrée / Chercher.</div>",
         unsafe_allow_html=True,
     )
     st.stop()
 
 view = apply_filters_and_sort(raw_items, sort_mode, only_my_apps, platform_filter, year_range)
 
-# ancre résultats
 st.markdown('<div id="results-anchor"></div>', unsafe_allow_html=True)
 st.write(f"✅ Résultats : {min(len(view), 20)} / {len(view)}")
 
@@ -1376,15 +1383,18 @@ if st.session_state.pop("scroll_to_results", False):
             if(document.activeElement && document.activeElement.blur){
               document.activeElement.blur();
             }
+            const fields = document.querySelectorAll("input, textarea");
+            fields.forEach(el => { try { el.blur(); } catch(e){} });
             if(document.body && document.body.focus){
               document.body.focus();
             }
           }catch(e){}
-          var el = document.getElementById("results-anchor");
+
+          const el = document.getElementById("results-anchor");
           if(el){
             el.scrollIntoView({behavior:"smooth", block:"start"});
           }
-        }, 160);
+        }, 180);
         </script>
         """,
         height=0,
@@ -1401,7 +1411,6 @@ def details_fr_links(show_id: str):
     return dedupe_streaming_options(opts)
 
 
-# résultats
 for item in view[:20]:
     show_id = str(item.get("api_id") or "")
     card_id = stable_id(item.get("show") or {}) if item.get("show") else (show_id or item["title"])
@@ -1412,6 +1421,12 @@ for item in view[:20]:
     with c_img:
         if item.get("poster"):
             st.image(item["poster"], width=140)
+            trailer_url = trailer_search_url(item["title"], item.get("year"))
+            if trailer_url:
+                st.markdown(
+                    f'<a class="ff-linkbox" href="{trailer_url}" target="_blank">Bande-annonce</a>',
+                    unsafe_allow_html=True,
+                )
 
     with c_txt:
         st.markdown(f"### {item['title']} ({item['year'] if item['year'] else ''})")
@@ -1437,10 +1452,9 @@ for item in view[:20]:
             st.markdown("**Tes plateformes :**")
             for g in mine:
                 primary, rest = pick_primary_option(g["opts"])
-                if primary and primary["link"]:
-                    st.markdown(f"- **{g['name']}** ({primary['type']}) → {primary['link']}")
-                else:
-                    st.markdown(f"- **{g['name']}** ({primary['type'] if primary else ''}) → *(lien non fourni)*")
+                label = f"**{g['name']}** ({primary['type'] if primary else ''})"
+                link = primary["link"] if primary and primary.get("link") else "*(lien non fourni)*"
+                st.markdown(f"{label} → {link}")
                 if rest:
                     with st.expander(f"… autres options sur {g['name']}"):
                         for opt in rest:
@@ -1454,7 +1468,7 @@ for item in view[:20]:
                     primary, rest = pick_primary_option(g["opts"])
                     label = primary["type"] if primary else ""
                     link = primary["link"] if primary and primary["link"] else "*(lien non fourni)*"
-                    st.markdown(f"- **{g['name']}** ({label}) → {link}")
+                    st.markdown(f"**{g['name']}** ({label}) → {link}")
                     if rest:
                         with st.expander(f"… autres options sur {g['name']}"):
                             for opt in rest:
@@ -1472,10 +1486,7 @@ for item in view[:20]:
 
             cast = item.get("cast") or []
             if cast:
-                links = [f"[{a}](?actor={quote(a)})" for a in cast[:12]]
-                st.markdown(
-                    "<div class='ff-linkbox'><b>Acteurs :</b> " + " ".join(links) + "</div>",
-                    unsafe_allow_html=True,
-                )
+                links = [f'<a class="ff-linkbox" href="?actor={quote(a)}">{a}</a>' for a in cast[:12]]
+                st.markdown("**Acteurs :** " + " ".join(links), unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
