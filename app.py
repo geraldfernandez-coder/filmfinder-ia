@@ -1431,22 +1431,36 @@ st.markdown("# Recherche")
 
 actual_theme = resolve_theme_name(profile.get("ui_theme", "Auto"))
 emoji = THEMES[actual_theme]["emoji"]
-theme_poster = get_theme_background_poster(actual_theme, profile.get("country", "fr"), profile.get("lang", "fr"))
+theme_poster = get_theme_background_poster(
+    actual_theme,
+    profile.get("country","fr"),
+    profile.get("lang","fr")
+)
+
 hero_style = f"background-image:url('{theme_poster}');" if theme_poster else ""
 
-st.markdown(
-    f"""
-    <div class="ff-hero">
-        <div class="ff-hero-bg" style="{hero_style}"></div>
-        <div class="ff-hero-overlay"></div>
-        <div class="ff-hero-content">
-            <div class="ff-hero-title">{emoji} Thème actif : {actual_theme}</div>
-            <div class="ff-hero-sub">Recherche par histoire, souvenir, titre exact ou acteur.</div>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+st.markdown(f"""
+<div class="ff-hero" style="background-image:url('{theme_poster}');background-size:cover;background-position:center;">
+<div style="
+background:linear-gradient(180deg,rgba(0,0,0,0.2),rgba(0,0,0,0.8));
+padding:20px;
+border-radius:16px;
+">
+
+<div style="
+background:white;
+padding:10px 14px;
+border-radius:12px;
+display:inline-block;
+">
+
+<b>🎬 Thème : {actual_theme}</b>
+
+</div>
+
+</div>
+</div>
+""",unsafe_allow_html=True)
 
 theme_pick = st.selectbox(
     "Thème",
