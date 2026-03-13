@@ -252,9 +252,16 @@ def apply_theme():
     }}
 
     
-    .ff-shell-title h1 {{ margin: 0; }}
-    .ff-shell-title p {{ margin: 4px 0 0 0; }}
-    .ff-result-title {{ font-size: 1.9rem; font-weight: 800; }}
+    .ff-bubble, .ff-result-bubble, .ff-shell-title {{
+        border-radius: 30px;
+        box-shadow: 0 14px 34px rgba(0,0,0,0.08);
+    }}
+    .ff-result-bubble {{
+        padding: 16px 18px 14px 18px;
+    }}
+    .stButton > button {{
+        border-radius: 999px !important;
+    }}
     
 
     @media (max-width: 768px) {{
@@ -307,13 +314,8 @@ def profile_platform_name_norms(profile: dict):
     country = profile.get("country", "fr")
     lang = profile.get("lang", "fr")
     out = set()
-
-    for name in profile.get("platform_names", []) or []:
-        if name:
-            out.add(normalize_service_name(name))
-
     try:
-        services, _ = get_services_safe(country, lang)
+        services = get_services(country, lang)
         id_to_name = {}
         for s in services:
             sid = s.get("id")
@@ -539,32 +541,10 @@ def sa_get(path: str, params: dict):
         raise RuntimeError(f"API ERROR {r.status_code}: {r.text[:300]}")
     return r.json()
 
-DEFAULT_SERVICES = [
-    {"id": "netflix", "name": "Netflix"},
-    {"id": "prime", "name": "Prime Video"},
-    {"id": "disney", "name": "Disney+"},
-    {"id": "max", "name": "HBO Max"},
-    {"id": "apple", "name": "Apple TV+"},
-    {"id": "canal", "name": "Canal+"},
-    {"id": "paramount", "name": "Paramount+"},
-    {"id": "arte", "name": "ARTE.tv"},
-    {"id": "francetv", "name": "france.tv"},
-    {"id": "molotov", "name": "Molotov"},
-]
-
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_services(country: str, lang: str):
     data = sa_get(f"/countries/{country}", {"output_language": lang})
     return data.get("services", []) or []
-
-def get_services_safe(country: str, lang: str):
-    try:
-        services = get_services(country, lang)
-        if services:
-            return services, None
-    except Exception as e:
-        return DEFAULT_SERVICES, str(e)
-    return DEFAULT_SERVICES, "Liste des plateformes indisponible pour le moment."
 
 def stable_id(sh: dict) -> str:
     return str(
@@ -997,18 +977,14 @@ if st.session_state["page"] == "Accueil":
         with c4:
             show_elsewhere = st.checkbox("Ailleurs", value=bool(profile.get("show_elsewhere", False)))
 
-        services, services_error = get_services_safe(country, lang)
-        name_to_id = {(s.get("name") or s.get("id")): (s.get("id") or s.get("name")) for s in services if (s.get("name") or s.get("id"))}
+        services = get_services(country, lang)
+        name_to_id = {(s.get("name") or s.get("id")): s.get("id") for s in services if (s.get("name") or s.get("id")) and s.get("id")}
         id_to_name = {v: k for k, v in name_to_id.items()}
-        default_names = [n for n in (profile.get("platform_names") or []) if n in name_to_id]
-        if not default_names:
-            default_names = [id_to_name[i] for i in profile.get("platform_ids", []) if i in id_to_name]
-        if services_error:
-            st.info("Liste des plateformes chargée en mode secours. Tu peux quand même continuer.")
+        default_names = [id_to_name[i] for i in profile.get("platform_ids", []) if i in id_to_name]
         chosen_names = st.multiselect("Tes plateformes", options=sorted(name_to_id.keys()), default=sorted(set(default_names)))
         platform_ids = [name_to_id[n] for n in chosen_names]
 
-        enter_btn = st.form_submit_button("Entrer", use_container_width=False)
+        enter_btn = st.form_submit_button("Entrer")
 
     if enter_btn:
         if not platform_ids:
@@ -1020,7 +996,6 @@ if st.session_state["page"] == "Accueil":
                 "lang": lang,
                 "show_type": "movie" if typ == "Film" else "series",
                 "platform_ids": platform_ids,
-                "platform_names": chosen_names,
                 "show_elsewhere": bool(show_elsewhere),
             }
             save_profile(profile)
@@ -1044,18 +1019,14 @@ if st.session_state["page"] == "Profil":
         with c4:
             show_elsewhere = st.checkbox("Ailleurs", value=bool(profile.get("show_elsewhere", False)))
 
-        services, services_error = get_services_safe(country, lang)
-        name_to_id = {(s.get("name") or s.get("id")): (s.get("id") or s.get("name")) for s in services if (s.get("name") or s.get("id"))}
+        services = get_services(country, lang)
+        name_to_id = {(s.get("name") or s.get("id")): s.get("id") for s in services if (s.get("name") or s.get("id")) and s.get("id")}
         id_to_name = {v: k for k, v in name_to_id.items()}
-        default_names = [n for n in (profile.get("platform_names") or []) if n in name_to_id]
-        if not default_names:
-            default_names = [id_to_name[i] for i in profile.get("platform_ids", []) if i in id_to_name]
-        if services_error:
-            st.info("Liste des plateformes chargée en mode secours. Tu peux quand même enregistrer.")
+        default_names = [id_to_name[i] for i in profile.get("platform_ids", []) if i in id_to_name]
         chosen_names = st.multiselect("Tes plateformes", options=sorted(name_to_id.keys()), default=sorted(set(default_names)))
         platform_ids = [name_to_id[n] for n in chosen_names]
 
-        ok_btn = st.form_submit_button("✅ Enregistrer", use_container_width=False)
+        ok_btn = st.form_submit_button("✅ Enregistrer")
 
     if ok_btn:
         if not platform_ids:
@@ -1067,7 +1038,6 @@ if st.session_state["page"] == "Profil":
                 "lang": lang,
                 "show_type": "movie" if typ == "Film" else "series",
                 "platform_ids": platform_ids,
-                "platform_names": chosen_names,
                 "show_elsewhere": bool(show_elsewhere),
             }
             save_profile(profile)
