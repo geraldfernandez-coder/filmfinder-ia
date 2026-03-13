@@ -85,16 +85,62 @@ st.session_state.setdefault("bg_name", "")
 st.session_state.setdefault("notice", "")
 
 
+def normalize_country(value):
+    v = str(value or "FR").strip().upper()
+    allowed = {"FR", "US", "GB", "CA", "BE", "CH"}
+    return v if v in allowed else "FR"
+
+
+def normalize_lang(value):
+    v = str(value or "fr-FR").strip()
+    mapping = {
+        "fr": "fr-FR", "fr-fr": "fr-FR", "fr_FR": "fr-FR",
+        "en": "en-US", "en-us": "en-US", "en_US": "en-US",
+        "en-gb": "en-GB", "en_GB": "en-GB",
+    }
+    key = v.lower().replace("_", "-")
+    return mapping.get(key, v if v in {"fr-FR", "en-US", "en-GB"} else "fr-FR")
+
+
+def normalize_show_type(value):
+    v = str(value or "movie").strip().lower()
+    if v in {"film", "movie", "movies"}:
+        return "movie"
+    if v in {"serie", "série", "series", "tv", "show", "shows"}:
+        return "tv"
+    return "movie"
+
+
+def normalize_platform_ids(values):
+    out = []
+    for raw in (values or []):
+        if raw in SERVICE_BY_ID:
+            sid = raw
+        elif raw in NAME_TO_ID:
+            sid = NAME_TO_ID[raw]
+        else:
+            sid = None
+            n = norm_text(str(raw))
+            for meta in SERVICE_CATALOG:
+                if n == norm_text(meta["name"]) or n in [norm_text(a) for a in meta.get("aliases", [])]:
+                    sid = meta["id"]
+                    break
+        if sid and sid not in out:
+            out.append(sid)
+    return out or ["netflix", "prime", "disney", "max"]
+
+
 def load_profile():
     if PROFILE_PATH.exists():
         try:
             data = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
-            data.setdefault("country", "FR")
-            data.setdefault("lang", "fr-FR")
-            data.setdefault("show_type", "movie")
-            data.setdefault("platform_ids", ["netflix", "prime", "disney", "max"])
-            data.setdefault("show_elsewhere", False)
-            return data
+            return {
+                "country": normalize_country(data.get("country", "FR")),
+                "lang": normalize_lang(data.get("lang", "fr-FR")),
+                "show_type": normalize_show_type(data.get("show_type", "movie")),
+                "platform_ids": normalize_platform_ids(data.get("platform_ids", ["netflix", "prime", "disney", "max"])),
+                "show_elsewhere": bool(data.get("show_elsewhere", False)),
+            }
         except Exception:
             pass
     return {
@@ -185,6 +231,12 @@ def pick_bg():
     st.session_state["bg_name"] = ""
     return demo_bg_data_uri()
 
+def safe_index(options, value, default=0):
+    try:
+        return options.index(value)
+    except Exception:
+        return default
+
 
 def apply_theme():
     bg = pick_bg()
@@ -262,8 +314,8 @@ def apply_theme():
         .ff-result-title {{ font-size: 1.65rem; }}
         .ff-title-pill {{ padding: 12px 18px; }}
         .ff-pill {{ padding: 6px 12px; }}
-        .ff-inline-input {{ max-width: calc(100vw - 110px); }}
-        .ff-inline-input.ff-textarea {{ max-width: calc(100vw - 110px); }}
+        .ff-inline-input {{ max-width: calc(100vw - 132px); }}
+        .ff-inline-input.ff-textarea {{ max-width: calc(100vw - 132px); }}
         .ff-clear button {{ height:38px !important; width:38px !important; min-height:38px !important; border-radius:14px !important; }}
     }}
     </style>
@@ -662,11 +714,13 @@ if not st.session_state["entered"]:
         st.markdown("<div class='ff-bubble ff-wide'>", unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns([1, 1, 1, 0.7])
         with c1:
-            country = st.selectbox("Pays", ["FR", "US", "GB", "CA", "BE", "CH"], index=["FR", "US", "GB", "CA", "BE", "CH"].index(profile["country"]))
+            country_options = ["FR", "US", "GB", "CA", "BE", "CH"]
+            country = st.selectbox("Pays", country_options, index=safe_index(country_options, normalize_country(profile.get("country")), 0))
         with c2:
-            lang = st.selectbox("Langue", ["fr-FR", "en-US", "en-GB"], index=["fr-FR", "en-US", "en-GB"].index(profile["lang"]))
+            lang_options = ["fr-FR", "en-US", "en-GB"]
+            lang = st.selectbox("Langue", lang_options, index=safe_index(lang_options, normalize_lang(profile.get("lang")), 0))
         with c3:
-            show_type_ui = st.selectbox("Type", ["Film", "Série"], index=0 if profile["show_type"] == "movie" else 1)
+            show_type_ui = st.selectbox("Type", ["Film", "Série"], index=0 if normalize_show_type(profile.get("show_type")) == "movie" else 1)
         with c4:
             show_elsewhere = st.checkbox("Ailleurs", value=profile.get("show_elsewhere", False))
 
