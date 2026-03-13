@@ -71,8 +71,8 @@ def apply_theme():
         background: rgba(255,255,255,0.92);
         border: 1px solid rgba(0,0,0,0.08);
         border-radius: 16px;
-        padding: 10px 12px;
-        margin: 6px 0 10px 0;
+        padding: 8px 10px;
+        margin: 4px 0 8px 0;
         box-shadow: 0 5px 14px rgba(0,0,0,0.05);
     }
 
@@ -112,67 +112,89 @@ def apply_theme():
         margin-top: 6px !important;
     }
 
-    .stTextInput > div > div,
-    .stTextArea > div > div,
-    .stSelectbox > div > div,
-    .stMultiSelect > div > div {
+    /* Widgets natifs : ciblage plus précis pour éviter les faux encadrés fins */
+    .stTextInput input,
+    .stTextArea textarea {
         background: rgba(255,255,255,0.96) !important;
         border-radius: 14px !important;
     }
 
-    .ff-inline-wrap{
+    .stSelectbox [data-baseweb="select"],
+    .stMultiSelect [data-baseweb="select"] {
+        background: rgba(255,255,255,0.96) !important;
+        border-radius: 14px !important;
+        border: 1px solid rgba(0,0,0,0.08) !important;
+        box-shadow: none !important;
+    }
+
+    .ff-inline-field{
         background: rgba(255,255,255,0.96);
         border: 1px solid rgba(0,0,0,0.10);
         border-radius: 16px;
-        padding: 6px 8px 6px 10px;
-        margin: 4px 0 8px 0;
+        padding: 4px 6px 4px 10px;
+        margin: 2px 0 8px 0;
         box-shadow: 0 4px 10px rgba(0,0,0,0.04);
     }
 
-    .ff-inline-wrap [data-testid="stHorizontalBlock"]{
+    .ff-inline-field [data-testid="stHorizontalBlock"]{
         align-items: center !important;
         gap: 6px !important;
     }
 
-    .ff-inline-wrap .stTextInput,
-    .ff-inline-wrap .stTextArea{
+    .ff-inline-field .stTextInput,
+    .ff-inline-field .stTextArea,
+    .ff-inline-field .stMarkdown {
         margin-bottom: 0 !important;
     }
 
-    .ff-inline-wrap .stTextInput > div,
-    .ff-inline-wrap .stTextArea > div{
-        margin-bottom: 0 !important;
+    .ff-inline-field .stTextInput > label,
+    .ff-inline-field .stTextArea > label {
+        display: none !important;
     }
 
-    .ff-inline-wrap .stTextInput > div > div,
-    .ff-inline-wrap .stTextArea > div > div{
+    .ff-inline-field .stTextInput > div,
+    .ff-inline-field .stTextArea > div,
+    .ff-inline-field .stTextInput > div > div,
+    .ff-inline-field .stTextArea > div > div {
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        border-radius: 12px !important;
-    }
-
-    .ff-inline-wrap button[kind],
-    .ff-clear-btn button{
-        min-height: 42px !important;
-        height: 42px !important;
-        width: 42px !important;
-        border-radius: 12px !important;
+        margin: 0 !important;
         padding: 0 !important;
-        font-size: 20px !important;
+    }
+
+    .ff-inline-field input,
+    .ff-inline-field textarea {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 8px 4px !important;
+    }
+
+    .ff-inline-field textarea {
+        min-height: 56px !important;
+    }
+
+    .ff-inline-field .stButton {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin-top: 0 !important;
+    }
+
+    .ff-inline-field .stButton > button {
+        min-height: 38px !important;
+        height: 38px !important;
+        width: 38px !important;
+        min-width: 38px !important;
+        border-radius: 11px !important;
+        padding: 0 !important;
         line-height: 1 !important;
+        font-size: 19px !important;
     }
 
-    .stMultiSelect > div[data-baseweb="select"]{
-        background: rgba(255,255,255,0.96) !important;
-        border: 2px solid rgba(0,0,0,0.12) !important;
-        border-radius: 14px !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.04) !important;
-        padding: 4px !important;
-    }
-
-    .stMultiSelect [data-baseweb="tag"]{
-        border-radius: 10px !important;
+    .stMultiSelect [data-baseweb="select"] {
+        border: 2px solid rgba(0,0,0,0.10) !important;
     }
 
     @media (max-width: 768px){
@@ -190,19 +212,6 @@ def apply_theme():
         }
         .main h1{
             font-size: 2.2rem !important;
-        }
-        .ff-inline-wrap{
-            padding: 4px 6px 4px 8px;
-            border-radius: 14px;
-        }
-        .ff-inline-wrap button[kind],
-        .ff-clear-btn button{
-            min-height: 38px !important;
-            height: 38px !important;
-            width: 38px !important;
-        }
-        .stMultiSelect > div[data-baseweb="select"]{
-            border-radius: 14px !important;
         }
     }
     </style>
@@ -930,44 +939,40 @@ st.markdown("<div class='ff-panel'>", unsafe_allow_html=True)
 st.markdown("<div id='ff-top-anchor'></div>", unsafe_allow_html=True)
 
 st.markdown("Ton souvenir (Entrée lance)")
-st.markdown("<div class='ff-inline-wrap'>", unsafe_allow_html=True)
-c_q1, c_x1 = st.columns([12, 1])
-with c_q1:
+st.markdown("<div class='ff-inline-field'>", unsafe_allow_html=True)
+col_q_main, col_x_main = st.columns([24, 2])
+with col_q_main:
     q_main = st.text_input(
-        label="Ton souvenir (Entrée lance)",
+        "Ton souvenir (Entrée lance)",
         key="q_main",
         label_visibility="collapsed",
         on_change=trigger_search,
         placeholder="Ex: homme extraterrestre renaît"
     )
-with c_x1:
-    st.markdown("<div class='ff-clear-btn'>", unsafe_allow_html=True)
+with col_x_main:
     if st.button("✕", key="clear_q_main"):
         st.session_state["q_main"] = ""
         st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
 if st.button("Trouver"):
     st.session_state["do_search"] = True
 
 st.markdown("Détails (optionnel)")
-st.markdown("<div class='ff-inline-wrap'>", unsafe_allow_html=True)
-c_q2, c_x2 = st.columns([12, 1])
-with c_q2:
+st.markdown("<div class='ff-inline-field'>", unsafe_allow_html=True)
+col_q_more, col_x_more = st.columns([24, 2])
+with col_q_more:
     q_more = st.text_area(
-        label="Détails (optionnel)",
+        "Détails (optionnel)",
         key="q_more",
         label_visibility="collapsed",
         height=68,
         placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…"
     )
-with c_x2:
-    st.markdown("<div class='ff-clear-btn'>", unsafe_allow_html=True)
+with col_x_more:
     if st.button("✕", key="clear_q_more"):
         st.session_state["q_more"] = ""
         st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
 selected_genres = []
