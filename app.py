@@ -55,23 +55,13 @@ def apply_theme():
         box-shadow: 0 8px 24px rgba(0,0,0,0.06);
         margin: 12px 0 18px 0;
     }
-
-    .ff-pill{
-        display:inline-block;
-        padding: 4px 10px;
-        border-radius: 999px;
-        background: rgba(0,0,0,0.06);
-        margin-right: 6px;
-        margin-bottom: 6px;
-        font-size: 13px;
-    }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
 apply_theme()
 
-# ================== PROFILE STORAGE ==================
+# ================== PROFILE ==================
 def load_profile():
     if PROFILE_PATH.exists():
         try:
@@ -103,13 +93,23 @@ def sa_get(path: str, params: dict):
         params=params,
         timeout=25,
     )
-    r.raise_for_status()
+    # IMPORTANT: on laisse remonter l'erreur lisiblement
+    if not r.ok:
+        raise RuntimeError(f"API ERROR {r.status_code}: {r.text[:400]}")
     return r.json()
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_services(country: str, lang: str):
     data = sa_get(f"/countries/{country}", {"output_language": lang})
     return data.get("services", []) or []
+
+@st.cache_data(show_spinner=False, ttl=300)
+def api_healthcheck():
+    try:
+        _ = sa_get("/countries/fr", {"output_language": "fr"})
+        return True, "API OK"
+    except Exception as e:
+        return False, str(e)
 
 def stable_id(sh: dict) -> str:
     return str(
@@ -131,14 +131,10 @@ def dedupe_streaming_options(options):
         out.append(o)
     return out
 
-def get_poster_url(show: dict) -> str | None:
-    """
-    L'API fournit imageSet.verticalPoster.w240/w360/...
-    (décrit dans leur schema OpenAPI).
-    """
+def get_poster_url(show: dict):
     try:
         vs = (show.get("imageSet") or {}).get("verticalPoster") or {}
-        return vs.get("w240") or vs.get("w360") or vs.get("w480")
+        return vs.get("w240") or vs.get("w360") or vs.get("w480") or None
     except Exception:
         return None
 
@@ -208,10 +204,6 @@ def ollama_is_up():
         return False
 
 def ollama_pack(description: str):
-    """
-    Retour attendu JSON:
-    {"titles":[...], "queries":[...]}
-    """
     prompt = f"""
 Tu aides à retrouver un film/série depuis un souvenir flou.
 Retourne UNIQUEMENT un JSON valide avec:
@@ -226,7 +218,8 @@ Souvenir: {description}
         json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
         timeout=60,
     )
-    r.raise_for_status()
+    if not r.ok:
+        raise RuntimeError(f"Ollama ERROR {r.status_code}: {r.text[:300]}")
     txt = r.json().get("response", "")
 
     start = txt.find("{")
@@ -238,20 +231,15 @@ Souvenir: {description}
     except Exception:
         return {"titles": [], "queries": []}
 
-# ================== ACCUEIL: affiche aléatoire ==================
+# ================== ACCUEIL: affiche ==================
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_home_poster(country: str, lang: str):
-    """
-    On prend une petite liste fixe de titres connus, et on récupère 1 poster au hasard.
-    (stable, léger, et pas besoin d'un endpoint "popular")
-    """
     titles = [
         "Inception", "The Matrix", "Interstellar", "Titanic", "Gladiator",
         "Avatar", "The Godfather", "Pulp Fiction", "The Dark Knight",
         "Forrest Gump", "Jurassic Park"
     ]
     random.shuffle(titles)
-
     for t in titles:
         try:
             res = search_by_title(t, country=country, show_type="movie", lang=lang)
@@ -268,12 +256,12 @@ st.session_state.setdefault("entered", False)
 st.session_state.setdefault("page", "Accueil")
 st.session_state.setdefault("do_search", False)
 
-# Une fois entré, plus d'Accueil dans le menu
-if st.session_state["entered"] and st.session_state["page"] == "Accueil":
-    st.session_state["page"] = "Recherche"
-
+# Sidebar
 with st.sidebar:
+    ok, msg = api_healthcheck()
     st.markdown("## FilmFinder IA")
+    st.caption("✅ " + msg if ok else "❌ " + msg)
+
     if st.session_state["entered"]:
         st.radio("Menu", ["Recherche", "Profil"], key="page")
     else:
@@ -284,7 +272,6 @@ if st.session_state["page"] == "Accueil":
     st.markdown("# FilmFinder IA")
     st.caption("Retrouve un film/série depuis un souvenir flou, et obtiens le lien pour le regarder.")
 
-    # Affiche “vraie” (pas un fond)
     if RAPIDAPI_KEY:
         poster_url, poster_title = get_home_poster(country=profile.get("country","fr"), lang=profile.get("lang","fr"))
         if poster_url:
@@ -296,18 +283,15 @@ if st.session_state["page"] == "Accueil":
                 st.caption(f"Affiche aléatoire : **{poster_title}**")
         else:
             st.markdown("### 🍿 Bienvenue")
-    else:
-        st.markdown("### 🍿 Bienvenue")
 
     st.markdown('<div class="ff-card">', unsafe_allow_html=True)
     st.markdown("### Inscription rapide")
-    st.caption("Pas de nom/prénom. Juste ce qui sert à filtrer la recherche.")
 
     if not RAPIDAPI_KEY:
         st.error("RAPIDAPI_KEY manquante dans .env (RapidAPI).")
         st.stop()
 
-    with st.form("signup_form", clear_on_submit=False):
+    with st.form("signup_form"):
         pseudo = st.text_input("Pseudo (optionnel)", value=profile.get("pseudo", ""))
 
         col1, col2, col3 = st.columns(3)
@@ -331,12 +315,10 @@ if st.session_state["page"] == "Accueil":
         chosen_names = st.multiselect("Tes plateformes", options=sorted(name_to_id.keys()), default=sorted(set(default_names)))
         platform_ids = [name_to_id[n] for n in chosen_names]
 
-        show_elsewhere = st.checkbox("Si pas dispo sur mes applis, montrer où c’est dispo ailleurs", value=bool(profile.get("show_elsewhere", False)))
+        show_elsewhere = st.checkbox("Si pas dispo sur mes applis, montrer ailleurs", value=bool(profile.get("show_elsewhere", False)))
 
         up = ollama_is_up()
         use_local_ai = st.checkbox("Activer IA locale (Ollama)", value=bool(profile.get("use_local_ai", False)), disabled=not up)
-        if not up:
-            st.caption("IA locale : Ollama non détecté (normal si pas installé).")
 
         enter_btn = st.form_submit_button("Entrer")
 
@@ -365,11 +347,6 @@ if st.session_state["page"] == "Accueil":
 # ================== PAGE: PROFIL ==================
 if st.session_state["page"] == "Profil":
     st.markdown("# Profil")
-    st.caption("Tu peux modifier tes plateformes / pays / langue quand tu veux.")
-
-    if not RAPIDAPI_KEY:
-        st.error("RAPIDAPI_KEY manquante dans .env (RapidAPI).")
-        st.stop()
 
     with st.form("profile_form"):
         pseudo = st.text_input("Pseudo (optionnel)", value=profile.get("pseudo", ""))
@@ -395,9 +372,9 @@ if st.session_state["page"] == "Profil":
         up = ollama_is_up()
         use_local_ai = st.checkbox("Activer IA locale (Ollama)", value=bool(profile.get("use_local_ai", False)), disabled=not up)
 
-        ok = st.form_submit_button("✅ Enregistrer")
+        ok_btn = st.form_submit_button("✅ Enregistrer")
 
-    if ok:
+    if ok_btn:
         if not platform_ids:
             st.warning("Coche au moins 1 plateforme 🙂")
         else:
@@ -419,31 +396,24 @@ if st.session_state["page"] == "Profil":
 # ================== PAGE: RECHERCHE ==================
 st.markdown("# Recherche")
 
-if not profile.get("platform_ids"):
-    st.warning("Tu dois avoir un profil (plateformes) pour chercher.")
-    st.stop()
-
 def trigger_search():
-    # appelé quand tu presses Entrée dans le champ principal
     st.session_state["do_search"] = True
 
-# Champ principal: ENTREE lance la recherche (on_change)
 q_main = st.text_input(
-    "Ton souvenir (appuie sur Entrée pour lancer)",
+    "Ton souvenir (Entrée lance la recherche)",
     key="q_main",
     on_change=trigger_search,
     placeholder="Ex: un homme se perd dans la forêt…"
 )
 
 with st.expander("Ajouter des détails (optionnel)"):
-    q_more = st.text_area("Détails", key="q_more", height=90, placeholder="Acteur, époque, scène, pays, etc.")
+    q_more = st.text_area("Détails", key="q_more", height=90)
 
-# bouton au cas où
 if st.button("Trouver"):
     st.session_state["do_search"] = True
 
 if st.session_state["do_search"]:
-    st.session_state["do_search"] = False  # reset immédiat
+    st.session_state["do_search"] = False
     q = (q_main.strip() + " " + q_more.strip()).strip()
 
     if not q:
@@ -456,48 +426,49 @@ if st.session_state["do_search"]:
     allowed_services = set(profile["platform_ids"])
     show_elsewhere = bool(profile.get("show_elsewhere", False))
 
-    found = []
     titles = []
     queries = []
+    errors = []
 
-    # IA locale si activée
-    if profile.get("use_local_ai") and ollama_is_up():
-        pack = ollama_pack(q)
-        titles = pack.get("titles", []) or []
-        queries = pack.get("queries", []) or []
+    try:
+        if profile.get("use_local_ai") and ollama_is_up():
+            pack = ollama_pack(q)
+            titles = pack.get("titles", []) or []
+            queries = pack.get("queries", []) or []
+    except Exception as e:
+        errors.append(f"IA locale: {e}")
 
-    # fallback sans IA
     if not queries:
         queries = [extract_keywords(q), q]
 
-    # 1) titres proposés par IA
+    st.caption("Requêtes utilisées : " + " | ".join(queries[:4]))
+
+    found = []
+
+    # Titres IA
     for t in titles[:10]:
         try:
             found += search_by_title(t, country, show_type, lang)
-        except Exception:
-            pass
+        except Exception as e:
+            errors.append(str(e))
 
-    # 2) mots-clés FR + EN
-    for kw in queries[:12]:
+    # Keywords FR/EN
+    for kw in queries[:8]:
         try:
             found += search_by_keyword(kw, country, show_type, lang)
-        except Exception:
-            pass
+        except Exception as e:
+            errors.append(str(e))
         try:
             found += search_by_keyword(kw, country, show_type, "en")
-        except Exception:
-            pass
-
-    # 3) titres entre guillemets
-    quoted = re.findall(r'"([^"]+)"', q)
-    for t in quoted[:5]:
-        try:
-            found += search_by_title(t, country, show_type, lang)
-        except Exception:
-            pass
+        except Exception as e:
+            errors.append(str(e))
 
     found = merge_results(found)
     found.sort(key=lambda sh: score(sh, q), reverse=True)
+
+    if errors:
+        # on n'affiche que 1-2 erreurs max pour pas spammer
+        st.warning("⚠️ Infos debug (utile si 0 résultat) :\n- " + "\n- ".join(errors[:2]))
 
     st.write(f"✅ Résultats : {len(found)} (20 max affichés)")
 
@@ -507,8 +478,8 @@ if st.session_state["do_search"]:
         overview = sh.get("overview", "")
 
         poster = get_poster_url(sh)
-
         c_img, c_txt = st.columns([1, 3])
+
         with c_img:
             if poster:
                 st.image(poster, width=140)
@@ -532,7 +503,7 @@ if st.session_state["do_search"]:
                     s = (o.get("service") or {})
                     name = s.get("name", s.get("id", "service"))
                     typ = o.get("type", "")
-                    link = o.get("link") or o.get("videoLink")  # link garanti par l’API
+                    link = o.get("link") or o.get("videoLink")
                     if link:
                         st.markdown(f"- **{name}** ({typ}) → {link}")
                     else:
