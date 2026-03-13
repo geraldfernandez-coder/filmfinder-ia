@@ -1,8 +1,6 @@
 import os
 import re
 import json
-import base64
-import random
 from pathlib import Path
 
 import requests
@@ -16,16 +14,60 @@ RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "").strip()
 RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com").strip()
 BASE_URL = "https://streaming-availability.p.rapidapi.com"
 
-# IA locale (Ollama)
+# IA locale (Ollama) - optionnel
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").strip()
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip()
 
 APP_DIR = Path(__file__).parent
 PROFILE_PATH = APP_DIR / "profile.json"
-BG_DIR = APP_DIR / "bg"
 
 st.set_page_config(page_title="FilmFinder IA", layout="centered")
 
+# ================== THEME (propre & lisible) ==================
+def apply_theme():
+    css = """
+    <style>
+    html, body, .stApp, [data-testid="stAppViewContainer"] {
+        background: #f4f6f8 !important;
+    }
+
+    /* bloc principal */
+    .main .block-container {
+        max-width: 980px !important;
+        margin: 18px auto !important;
+        background: #ffffff !important;
+        border-radius: 18px !important;
+        padding: 22px 26px 30px 26px !important;
+        box-shadow: 0 10px 35px rgba(0,0,0,0.08) !important;
+    }
+
+    /* sidebar */
+    [data-testid="stSidebar"] > div:first-child {
+        background: #ffffff !important;
+        border-right: 1px solid rgba(0,0,0,0.06);
+    }
+
+    /* texte */
+    .main h1, .main h2, .main h3, .main p, .main label, .main span, .main div, .main li {
+        color: #111 !important;
+    }
+    .main a { color: #0b57d0 !important; font-weight: 600; }
+
+    /* cartes jolies */
+    .ff-card {
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 16px;
+        padding: 16px 16px 6px 16px;
+        background: rgba(255,255,255,0.98);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+        margin: 12px 0 18px 0;
+    }
+    .ff-card h3 { margin-top: 0; }
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+apply_theme()
 
 # ================== PROFILE STORAGE ==================
 def load_profile():
@@ -48,37 +90,6 @@ def save_profile(p):
     PROFILE_PATH.write_text(json.dumps(p, ensure_ascii=False, indent=2), encoding="utf-8")
 
 profile = load_profile()
-
-
-# ================== THEME (SANS IMAGE) ==================
-def apply_plain_theme():
-    css = """
-    <style>
-    html, body, .stApp, [data-testid="stAppViewContainer"] {
-        background: #f4f6f8 !important;
-    }
-    [data-testid="stSidebar"] > div:first-child {
-        background: #ffffff !important;
-        border-right: 1px solid rgba(0,0,0,0.06);
-    }
-    .main .block-container {
-        max-width: 980px !important;
-        margin: 18px auto !important;
-        background: #ffffff !important;
-        border-radius: 18px !important;
-        padding: 22px 26px 30px 26px !important;
-        box-shadow: 0 10px 35px rgba(0,0,0,0.08) !important;
-    }
-    .main h1, .main h2, .main h3, .main p, .main label, .main span, .main div, .main li {
-        color: #111 !important;
-    }
-    .main a { color: #0b57d0 !important; font-weight: 600; }
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
-
-apply_plain_theme()
-
 
 # ================== RAPIDAPI ==================
 def sa_get(path: str, params: dict):
@@ -117,7 +128,6 @@ def stable_id(sh: dict) -> str:
         or sh.get("tmdbId")
         or (sh.get("title", "") + "_" + str(sh.get("releaseYear") or sh.get("firstAirYear") or ""))
     )
-
 
 # ================== SEARCH HELPERS ==================
 def score(sh, qtext):
@@ -176,7 +186,6 @@ def extract_keywords(text: str, max_words: int = 10) -> str:
             break
     return " ".join(out) if out else text.strip()
 
-
 # ================== IA LOCALE (Ollama) ==================
 def ollama_is_up():
     try:
@@ -186,11 +195,15 @@ def ollama_is_up():
         return False
 
 def ollama_pack(description: str):
+    """
+    Retour attendu JSON:
+    {"titles":[...], "queries":[...]}
+    """
     prompt = f"""
 Tu aides à retrouver un film/série depuis un souvenir flou.
 Retourne UNIQUEMENT un JSON valide avec:
-- "titles": liste de 5 à 10 titres probables (FR + original si possible)
-- "queries": liste de 6 à 12 requêtes (FR/EN) pour chercher dans une base de films
+- "titles": 5 à 10 titres probables (FR + original si possible)
+- "queries": 6 à 12 requêtes (FR/EN) pour chercher dans une base de films
 
 Souvenir: {description}
 """.strip()
@@ -212,48 +225,37 @@ Souvenir: {description}
     except Exception:
         return {"titles": [], "queries": []}
 
-
 # ================== ROUTING ==================
-if "page" not in st.session_state:
-    st.session_state["page"] = "Accueil"
+st.session_state.setdefault("entered", False)
+st.session_state.setdefault("page", "Accueil")
 
+# Si l'utilisateur est déjà "entré", on ne doit plus jamais rester sur Accueil
+if st.session_state["entered"] and st.session_state["page"] == "Accueil":
+    st.session_state["page"] = "Recherche"
+
+# Sidebar: après entrée -> seulement Profil / Recherche
 with st.sidebar:
-    st.markdown("## Navigation")
-    st.session_state["page"] = st.radio("Page", ["Accueil", "Profil", "Recherche"], index=["Accueil","Profil","Recherche"].index(st.session_state["page"]))
-
+    st.markdown("## FilmFinder IA")
+    if st.session_state["entered"]:
+        st.radio("Menu", ["Recherche", "Profil"], key="page")
+    else:
+        st.caption("Accueil (1ère fois seulement)")
 
 # ================== PAGE: ACCUEIL ==================
 if st.session_state["page"] == "Accueil":
     st.markdown("# FilmFinder IA")
     st.caption("Retrouve un film/série depuis un souvenir flou, et obtiens le lien pour le regarder.")
 
-    colA, colB, colC = st.columns([1,2,1])
-    with colB:
-        st.markdown(
-            """
-            <div style="text-align:center; font-size:80px; line-height:1; margin-top:10px; margin-bottom:10px;">
-                🍿
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        if st.button("Entrer", use_container_width=True):
-            st.session_state["page"] = "Recherche" if profile.get("platform_ids") else "Profil"
-            st.rerun()
-
-    st.stop()
-
-
-# ================== PAGE: PROFIL ==================
-if st.session_state["page"] == "Profil":
-    st.markdown("# Profil")
+    st.markdown('<div class="ff-card">', unsafe_allow_html=True)
+    st.markdown("### 🍿 Inscription rapide")
     st.caption("Pas de nom/prénom. Juste ce qui sert à filtrer la recherche.")
 
     if not RAPIDAPI_KEY:
         st.error("RAPIDAPI_KEY manquante dans .env (RapidAPI).")
         st.stop()
 
-    with st.form("profile_form"):
+    # Form inscription (jolie + simple)
+    with st.form("signup_form", clear_on_submit=False):
         pseudo = st.text_input("Pseudo (optionnel)", value=profile.get("pseudo", ""))
 
         col1, col2, col3 = st.columns(3)
@@ -279,11 +281,67 @@ if st.session_state["page"] == "Profil":
 
         show_elsewhere = st.checkbox("Si pas dispo sur mes applis, montrer où c’est dispo ailleurs", value=bool(profile.get("show_elsewhere", False)))
 
-        st.subheader("IA locale (option)")
         up = ollama_is_up()
         use_local_ai = st.checkbox("Activer IA locale (Ollama)", value=bool(profile.get("use_local_ai", False)), disabled=not up)
         if not up:
-            st.caption("Ollama non détecté (normal si pas installé).")
+            st.caption("IA locale : Ollama non détecté (normal si pas installé).")
+
+        enter_btn = st.form_submit_button("Entrer")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if enter_btn:
+        if not platform_ids:
+            st.warning("Coche au moins 1 plateforme 🙂")
+        else:
+            profile = {
+                "pseudo": pseudo.strip(),
+                "country": country,
+                "lang": lang,
+                "show_type": show_type,
+                "platform_ids": platform_ids,
+                "show_elsewhere": show_elsewhere,
+                "use_local_ai": bool(use_local_ai),
+            }
+            save_profile(profile)
+            st.session_state["entered"] = True
+            st.session_state["page"] = "Recherche"
+            st.rerun()
+
+    st.stop()
+
+# ================== PAGE: PROFIL ==================
+if st.session_state["page"] == "Profil":
+    st.markdown("# Profil")
+    st.caption("Tu peux modifier tes plateformes / pays / langue quand tu veux.")
+
+    if not RAPIDAPI_KEY:
+        st.error("RAPIDAPI_KEY manquante dans .env (RapidAPI).")
+        st.stop()
+
+    with st.form("profile_form"):
+        pseudo = st.text_input("Pseudo (optionnel)", value=profile.get("pseudo", ""))
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            country = st.selectbox("Pays", ["fr","be","ch","gb","us"], index=["fr","be","ch","gb","us"].index(profile.get("country","fr")))
+        with col2:
+            lang = st.selectbox("Langue", ["fr","en"], index=["fr","en"].index(profile.get("lang","fr")))
+        with col3:
+            show_type = st.selectbox("Type", ["all","movie","series"], index=["all","movie","series"].index(profile.get("show_type","all")))
+
+        services = get_services(country, lang)
+        name_to_id = {(s.get("name") or s.get("id")): s.get("id") for s in services if (s.get("name") or s.get("id")) and s.get("id")}
+        id_to_name = {v: k for k, v in name_to_id.items()}
+
+        default_names = [id_to_name[i] for i in profile.get("platform_ids", []) if i in id_to_name]
+        chosen_names = st.multiselect("Tes plateformes", options=sorted(name_to_id.keys()), default=sorted(set(default_names)))
+        platform_ids = [name_to_id[n] for n in chosen_names]
+
+        show_elsewhere = st.checkbox("Si pas dispo sur mes applis, montrer ailleurs", value=bool(profile.get("show_elsewhere", False)))
+
+        up = ollama_is_up()
+        use_local_ai = st.checkbox("Activer IA locale (Ollama)", value=bool(profile.get("use_local_ai", False)), disabled=not up)
 
         ok = st.form_submit_button("✅ Enregistrer")
 
@@ -301,22 +359,29 @@ if st.session_state["page"] == "Profil":
                 "use_local_ai": bool(use_local_ai),
             }
             save_profile(profile)
-            st.success("Profil enregistré. Va sur Recherche.")
-    st.stop()
+            st.success("Profil enregistré.")
+            st.rerun()
 
+    st.stop()
 
 # ================== PAGE: RECHERCHE ==================
 st.markdown("# Recherche")
+
 if not profile.get("platform_ids"):
-    st.warning("Crée ton profil (plateformes) avant de chercher.")
+    st.warning("Tu dois avoir un profil (plateformes) pour chercher.")
     st.stop()
 
-q = st.text_area("Ton souvenir (phrase libre) :", height=120)
-go = st.button("🔎 Trouver")
+# Form: Entrée = recherche automatique (text_input)
+with st.form("search_form", clear_on_submit=False):
+    q_main = st.text_input("Ton souvenir (appuie sur Entrée pour lancer)", value="", placeholder="Ex: un mec revit la même journée en boucle…")
+    with st.expander("Ajouter des détails (optionnel)"):
+        q_more = st.text_area("Détails", height=90, placeholder="Acteur, époque, scène, pays, etc.")
+    go = st.form_submit_button("Trouver")
 
 if go:
-    if not q.strip():
-        st.warning("Écris quelque chose 🙂")
+    q = (q_main.strip() + " " + q_more.strip()).strip()
+    if not q:
+        st.warning("Écris au moins une phrase 🙂")
         st.stop()
 
     country = profile["country"]
@@ -329,20 +394,24 @@ if go:
     titles = []
     queries = []
 
+    # IA locale si activée
     if profile.get("use_local_ai") and ollama_is_up():
-        pack = ollama_pack(q.strip())
+        pack = ollama_pack(q)
         titles = pack.get("titles", []) or []
         queries = pack.get("queries", []) or []
 
+    # fallback sans IA
     if not queries:
-        queries = [extract_keywords(q), q.strip()]
+        queries = [extract_keywords(q), q]
 
+    # 1) titres proposés par IA
     for t in titles[:10]:
         try:
             found += search_by_title(t, country, show_type, lang)
         except Exception:
             pass
 
+    # 2) mots-clés FR + EN
     for kw in queries[:12]:
         try:
             found += search_by_keyword(kw, country, show_type, lang)
@@ -353,6 +422,7 @@ if go:
         except Exception:
             pass
 
+    # 3) titres entre guillemets "..."
     quoted = re.findall(r'"([^"]+)"', q)
     for t in quoted[:5]:
         try:
