@@ -1178,6 +1178,9 @@ MODE_PRESETS = {
 def trigger_search():
     st.session_state["do_search"] = True
 
+def clear_input(key: str):
+    st.session_state[key] = ""
+
 q_main_default = "" if st.session_state.get("actor_search") else st.session_state.get("last_typed_main", "")
 q_more_default = st.session_state.get("last_typed_more", "")
 st.session_state.setdefault("q_main", q_main_default)
@@ -1215,9 +1218,7 @@ with col1:
     )
 with col2:
     st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    if st.button("✕", key="clear_q_main", help="Vider le souvenir"):
-        st.session_state["q_main"] = ""
-        st.rerun()
+    st.button("✕", key="clear_q_main", help="Vider le souvenir", on_click=clear_input, args=("q_main",))
     st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
@@ -1235,9 +1236,7 @@ with col3:
     )
 with col4:
     st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    if st.button("✕", key="clear_q_more", help="Vider les détails"):
-        st.session_state["q_more"] = ""
-        st.rerun()
+    st.button("✕", key="clear_q_more", help="Vider les détails", on_click=clear_input, args=("q_more",))
     st.markdown("</div>", unsafe_allow_html=True)
 
 with st.expander("Filtres", expanded=False):
