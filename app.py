@@ -41,7 +41,7 @@ THEMES = {
         "bubble_radius": "24px",
         "card_bg": "rgba(255,255,255,0.95)",
         "card_border": "rgba(255,255,255,0.85)",
-        "page_scrim": "linear-gradient(rgba(236,240,245,0.78), rgba(236,240,245,0.82))",
+        "page_scrim": "linear-gradient(rgba(236,240,245,0.54), rgba(236,240,245,0.60))",
     },
     "B": {
         "name": "Compact Pro",
@@ -371,10 +371,49 @@ def file_to_data_uri(path: Path):
     except Exception:
         return ""
 
+def demo_bg_data_uri():
+    svg = """
+    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1080 1920'>
+      <defs>
+        <linearGradient id='g1' x1='0' y1='0' x2='1' y2='1'>
+          <stop offset='0%' stop-color='#1f2937'/>
+          <stop offset='40%' stop-color='#7c2d12'/>
+          <stop offset='100%' stop-color='#111827'/>
+        </linearGradient>
+        <linearGradient id='g2' x1='0' y1='0' x2='1' y2='0'>
+          <stop offset='0%' stop-color='#ef4444'/>
+          <stop offset='100%' stop-color='#f59e0b'/>
+        </linearGradient>
+        <linearGradient id='g3' x1='0' y1='0' x2='0' y2='1'>
+          <stop offset='0%' stop-color='#0f172a'/>
+          <stop offset='100%' stop-color='#1d4ed8'/>
+        </linearGradient>
+        <filter id='blur'><feGaussianBlur stdDeviation='10'/></filter>
+      </defs>
+      <rect width='1080' height='1920' fill='url(#g1)'/>
+      <rect x='40' y='80' width='300' height='460' rx='28' fill='url(#g2)' opacity='0.88'/>
+      <rect x='380' y='120' width='270' height='400' rx='28' fill='#7c3aed' opacity='0.86'/>
+      <rect x='700' y='70' width='320' height='500' rx='28' fill='url(#g3)' opacity='0.92'/>
+      <rect x='70' y='610' width='260' height='420' rx='28' fill='#0ea5e9' opacity='0.82'/>
+      <rect x='380' y='590' width='290' height='430' rx='28' fill='#111827' opacity='0.88'/>
+      <rect x='720' y='640' width='280' height='420' rx='28' fill='#ec4899' opacity='0.78'/>
+      <rect x='60' y='1110' width='320' height='470' rx='28' fill='#16a34a' opacity='0.80'/>
+      <rect x='430' y='1070' width='260' height='450' rx='28' fill='#f97316' opacity='0.85'/>
+      <rect x='720' y='1130' width='270' height='430' rx='28' fill='#334155' opacity='0.90'/>
+      <circle cx='140' cy='1620' r='170' fill='#ffffff' opacity='0.10' filter='url(#blur)'/>
+      <circle cx='940' cy='240' r='180' fill='#ffffff' opacity='0.10' filter='url(#blur)'/>
+      <circle cx='820' cy='1680' r='150' fill='#fb7185' opacity='0.16' filter='url(#blur)'/>
+      <circle cx='350' cy='920' r='140' fill='#fde68a' opacity='0.10' filter='url(#blur)'/>
+      <rect x='0' y='0' width='1080' height='1920' fill='rgba(0,0,0,0.10)'/>
+    </svg>
+    """.strip()
+    data = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{data}"
+
 # ================== THEME APPLY ==================
 def apply_theme():
     bg_path = pick_bg_image()
-    bg_uri = file_to_data_uri(bg_path) if bg_path else ""
+    bg_uri = file_to_data_uri(bg_path) if bg_path else demo_bg_data_uri()
     if bg_uri:
         background_rule = f"background-image: {THEME['page_scrim']}, url('{bg_uri}'); background-size: cover; background-position: center center;"
     else:
