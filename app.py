@@ -29,7 +29,7 @@ BG_DIR = APP_DIR / "bg"
 st.set_page_config(page_title="FilmFinder IA", layout="centered")
 
 # ================== THEME ==================
-VARIANT = "A"
+VARIANT = "B"
 THEMES = {
     "A": {
         "name": "Bulles Messenger",
