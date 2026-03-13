@@ -15,7 +15,7 @@ RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "").strip()
 RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com").strip()
 BASE_URL = "https://streaming-availability.p.rapidapi.com"
 
-# IA locale (Ollama) - optionnel
+# IA locale (Ollama) - activée d'office si dispo
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").strip()
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip()
 
@@ -61,6 +61,46 @@ def apply_theme():
 
 apply_theme()
 
+# ================== OLLAMA (IA locale) ==================
+def ollama_is_up() -> bool:
+    try:
+        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=2)
+        return r.ok
+    except Exception:
+        return False
+
+def ollama_pack(description: str):
+    """
+    Retour attendu JSON:
+    {"titles":[...], "queries":[...]}
+    """
+    prompt = f"""
+Tu aides à retrouver un film/série depuis un souvenir flou.
+Retourne UNIQUEMENT un JSON valide avec:
+- "titles": 5 à 10 titres probables (FR + original si possible)
+- "queries": 6 à 12 requêtes (FR/EN) pour chercher dans une base de films
+
+Souvenir: {description}
+""".strip()
+
+    r = requests.post(
+        f"{OLLAMA_URL}/api/generate",
+        json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+        timeout=60,
+    )
+    if not r.ok:
+        raise RuntimeError(f"Ollama ERROR {r.status_code}: {r.text[:300]}")
+
+    txt = r.json().get("response", "")
+    start = txt.find("{")
+    end = txt.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return {"titles": [], "queries": []}
+    try:
+        return json.loads(txt[start:end + 1])
+    except Exception:
+        return {"titles": [], "queries": []}
+
 # ================== PROFILE ==================
 def load_profile():
     if PROFILE_PATH.exists():
@@ -75,13 +115,20 @@ def load_profile():
         "show_type": "all",
         "platform_ids": [],
         "show_elsewhere": False,
-        "use_local_ai": False,
+        # on le garde en profil, mais on va forcer ON si Ollama est dispo
+        "use_local_ai": True,
     }
 
 def save_profile(p):
     PROFILE_PATH.write_text(json.dumps(p, ensure_ascii=False, indent=2), encoding="utf-8")
 
 profile = load_profile()
+
+# FORCER IA LOCALE D'OFFICE si Ollama tourne
+if ollama_is_up():
+    if profile.get("use_local_ai") is not True:
+        profile["use_local_ai"] = True
+        save_profile(profile)
 
 # ================== RAPIDAPI ==================
 def sa_get(path: str, params: dict):
@@ -93,7 +140,6 @@ def sa_get(path: str, params: dict):
         params=params,
         timeout=25,
     )
-    # IMPORTANT: on laisse remonter l'erreur lisiblement
     if not r.ok:
         raise RuntimeError(f"API ERROR {r.status_code}: {r.text[:400]}")
     return r.json()
@@ -195,42 +241,6 @@ def extract_keywords(text: str, max_words: int = 10) -> str:
             break
     return " ".join(out) if out else text.strip()
 
-# ================== IA LOCALE (Ollama) ==================
-def ollama_is_up():
-    try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=2)
-        return r.ok
-    except Exception:
-        return False
-
-def ollama_pack(description: str):
-    prompt = f"""
-Tu aides à retrouver un film/série depuis un souvenir flou.
-Retourne UNIQUEMENT un JSON valide avec:
-- "titles": 5 à 10 titres probables (FR + original si possible)
-- "queries": 6 à 12 requêtes (FR/EN) pour chercher dans une base de films
-
-Souvenir: {description}
-""".strip()
-
-    r = requests.post(
-        f"{OLLAMA_URL}/api/generate",
-        json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
-        timeout=60,
-    )
-    if not r.ok:
-        raise RuntimeError(f"Ollama ERROR {r.status_code}: {r.text[:300]}")
-    txt = r.json().get("response", "")
-
-    start = txt.find("{")
-    end = txt.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        return {"titles": [], "queries": []}
-    try:
-        return json.loads(txt[start:end + 1])
-    except Exception:
-        return {"titles": [], "queries": []}
-
 # ================== ACCUEIL: affiche ==================
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_home_poster(country: str, lang: str):
@@ -251,26 +261,26 @@ def get_home_poster(country: str, lang: str):
             pass
     return None, None
 
-# ================== ROUTING / MENU ==================
+# ================== MENU ==================
 st.session_state.setdefault("entered", False)
 st.session_state.setdefault("page", "Accueil")
 st.session_state.setdefault("do_search", False)
 
-# Sidebar
 with st.sidebar:
     ok, msg = api_healthcheck()
     st.markdown("## FilmFinder IA")
     st.caption("✅ " + msg if ok else "❌ " + msg)
+    st.caption("🤖 IA locale : " + ("ON" if ollama_is_up() else "OFF"))
 
     if st.session_state["entered"]:
         st.radio("Menu", ["Recherche", "Profil"], key="page")
     else:
         st.caption("Accueil (début uniquement)")
 
-# ================== PAGE: ACCUEIL ==================
+# ================== ACCUEIL ==================
 if st.session_state["page"] == "Accueil":
     st.markdown("# FilmFinder IA")
-    st.caption("Retrouve un film/série depuis un souvenir flou, et obtiens le lien pour le regarder.")
+    st.caption("Souvenir flou → titres probables → où regarder (liens).")
 
     if RAPIDAPI_KEY:
         poster_url, poster_title = get_home_poster(country=profile.get("country","fr"), lang=profile.get("lang","fr"))
@@ -317,9 +327,6 @@ if st.session_state["page"] == "Accueil":
 
         show_elsewhere = st.checkbox("Si pas dispo sur mes applis, montrer ailleurs", value=bool(profile.get("show_elsewhere", False)))
 
-        up = ollama_is_up()
-        use_local_ai = st.checkbox("Activer IA locale (Ollama)", value=bool(profile.get("use_local_ai", False)), disabled=not up)
-
         enter_btn = st.form_submit_button("Entrer")
 
     st.markdown("</div>", unsafe_allow_html=True)
@@ -335,7 +342,7 @@ if st.session_state["page"] == "Accueil":
                 "show_type": show_type,
                 "platform_ids": platform_ids,
                 "show_elsewhere": show_elsewhere,
-                "use_local_ai": bool(use_local_ai),
+                "use_local_ai": True,  # <= toujours ON
             }
             save_profile(profile)
             st.session_state["entered"] = True
@@ -344,9 +351,10 @@ if st.session_state["page"] == "Accueil":
 
     st.stop()
 
-# ================== PAGE: PROFIL ==================
+# ================== PROFIL ==================
 if st.session_state["page"] == "Profil":
     st.markdown("# Profil")
+    st.caption("IA locale est activée d’office si Ollama est dispo (tu n’as rien à cocher).")
 
     with st.form("profile_form"):
         pseudo = st.text_input("Pseudo (optionnel)", value=profile.get("pseudo", ""))
@@ -369,9 +377,6 @@ if st.session_state["page"] == "Profil":
 
         show_elsewhere = st.checkbox("Si pas dispo sur mes applis, montrer ailleurs", value=bool(profile.get("show_elsewhere", False)))
 
-        up = ollama_is_up()
-        use_local_ai = st.checkbox("Activer IA locale (Ollama)", value=bool(profile.get("use_local_ai", False)), disabled=not up)
-
         ok_btn = st.form_submit_button("✅ Enregistrer")
 
     if ok_btn:
@@ -385,7 +390,7 @@ if st.session_state["page"] == "Profil":
                 "show_type": show_type,
                 "platform_ids": platform_ids,
                 "show_elsewhere": show_elsewhere,
-                "use_local_ai": bool(use_local_ai),
+                "use_local_ai": True,  # <= toujours ON
             }
             save_profile(profile)
             st.success("Profil enregistré.")
@@ -393,7 +398,7 @@ if st.session_state["page"] == "Profil":
 
     st.stop()
 
-# ================== PAGE: RECHERCHE ==================
+# ================== RECHERCHE ==================
 st.markdown("# Recherche")
 
 def trigger_search():
@@ -430,29 +435,29 @@ if st.session_state["do_search"]:
     queries = []
     errors = []
 
-    try:
-        if profile.get("use_local_ai") and ollama_is_up():
+    # IA locale d’office si dispo
+    if ollama_is_up():
+        try:
             pack = ollama_pack(q)
             titles = pack.get("titles", []) or []
             queries = pack.get("queries", []) or []
-    except Exception as e:
-        errors.append(f"IA locale: {e}")
+        except Exception as e:
+            errors.append(f"IA locale: {e}")
 
+    # fallback sans IA
     if not queries:
         queries = [extract_keywords(q), q]
 
-    st.caption("Requêtes utilisées : " + " | ".join(queries[:4]))
+    st.caption("Requêtes : " + " | ".join(queries[:4]))
 
     found = []
 
-    # Titres IA
     for t in titles[:10]:
         try:
             found += search_by_title(t, country, show_type, lang)
         except Exception as e:
             errors.append(str(e))
 
-    # Keywords FR/EN
     for kw in queries[:8]:
         try:
             found += search_by_keyword(kw, country, show_type, lang)
@@ -467,8 +472,7 @@ if st.session_state["do_search"]:
     found.sort(key=lambda sh: score(sh, q), reverse=True)
 
     if errors:
-        # on n'affiche que 1-2 erreurs max pour pas spammer
-        st.warning("⚠️ Infos debug (utile si 0 résultat) :\n- " + "\n- ".join(errors[:2]))
+        st.warning("⚠️ Debug (utile si 0 résultat) :\n- " + "\n- ".join(errors[:2]))
 
     st.write(f"✅ Résultats : {len(found)} (20 max affichés)")
 
