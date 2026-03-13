@@ -251,10 +251,10 @@ def apply_theme():
         position: fixed;
         inset: 0;
         z-index: -2;
-        background-image: linear-gradient(rgba(18,23,34,0.28), rgba(18,23,34,0.22)), url('{bg}');
+        background-image: linear-gradient(rgba(252,253,255,0.66), rgba(246,248,252,0.56)), url('{bg}');
         background-size: cover;
         background-position: center center;
-        filter: saturate(1.04);
+        filter: saturate(0.98) brightness(1.02);
     }}
     [data-testid='stHeader'] {{ background: transparent !important; }}
     .main .block-container {{
@@ -293,7 +293,7 @@ def apply_theme():
         padding: 10px 14px;
         border-radius: 18px;
         background: rgba(255,255,255,0.80);
-        color: rgba(23,35,59,0.82);
+        color: rgba(16,24,40,0.92);
         margin: 0 0 14px 0;
         box-shadow: 0 10px 22px rgba(19,24,38,0.08);
         backdrop-filter: blur(10px);
@@ -308,7 +308,7 @@ def apply_theme():
     .ff-inline-note {{
         padding: 9px 12px;
         margin: 4px 0 10px 0;
-        color: rgba(23,35,59,0.88);
+        color: rgba(16,24,40,0.94);
         border-radius: 18px;
     }}
     .ff-bubble {{
@@ -366,6 +366,14 @@ def apply_theme():
         color: #17233b !important;
         font-size: 1rem !important;
     }}
+    div[data-testid='stTextInput'] input::placeholder,
+    div[data-testid='stTextArea'] textarea::placeholder {
+        color: #5a6885 !important;
+        opacity: 1 !important;
+    }
+    label, p, span, div[data-testid='stMarkdownContainer'] p, .stMarkdown, .stText, .stCaption {
+        color: #17233b !important;
+    }
     div[data-testid='stTextArea'] textarea {{ min-height: 94px !important; }}
 
     div[data-testid='stCheckbox'] {{
