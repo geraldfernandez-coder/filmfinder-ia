@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import random
 import gzip
 import io
 import difflib
@@ -10,23 +11,24 @@ import xml.etree.ElementTree as ET
 
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 from dotenv import load_dotenv
-import html
-from urllib.parse import quote
 
 # ================== CONFIG ==================
 load_dotenv()
 
+# Streaming Availability (RapidAPI)
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "").strip()
 RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com").strip()
 BASE_URL = "https://streaming-availability.p.rapidapi.com"
 
+# IA locale (Ollama) - ON si dispo
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").strip()
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip()
 
+# Notes critiques via OMDb (optionnel)
 OMDB_API_KEY = os.getenv("OMDB_API_KEY", "").strip()
 
+# TNT (XMLTVFr) - optionnel (on tente des URL par défaut)
 XMLTV_TNT_URL = os.getenv("XMLTV_TNT_URL", "").strip()
 TNT_LOOKAHEAD_DAYS = int(os.getenv("TNT_LOOKAHEAD_DAYS", "5"))
 
@@ -39,210 +41,40 @@ st.set_page_config(page_title="FilmFinder IA", layout="centered")
 def apply_theme():
     css = """
     <style>
-    html, body, .stApp, [data-testid="stAppViewContainer"] {
-        background: #eef1f5 !important;
-    }
+    html, body, .stApp, [data-testid="stAppViewContainer"] { background: #f4f6f8 !important; }
 
     .main .block-container{
-        max-width: 1100px !important;
-        margin: 8px auto !important;
-        background: rgba(255,255,255,0.94) !important;
+        max-width: 1040px !important;
+        margin: 18px auto !important;
+        background: #ffffff !important;
         border-radius: 18px !important;
-        padding: 12px 16px 20px 16px !important;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.07) !important;
-        backdrop-filter: blur(2px);
+        padding: 22px 26px 30px 26px !important;
+        box-shadow: 0 10px 35px rgba(0,0,0,0.08) !important;
     }
 
     [data-testid="stSidebar"] > div:first-child{
-        background: rgba(255,255,255,0.96) !important;
+        background: #ffffff !important;
         border-right: 1px solid rgba(0,0,0,0.06);
     }
 
-    .main h1, .main h2 {
-        margin-top: 0.15rem !important;
-        margin-bottom: 0.4rem !important;
-    }
+    .main h1,.main h2,.main h3,.main p,.main label,.main span,.main div,.main li{ color:#111 !important; }
+    .main a{ color:#0b57d0 !important; font-weight:600; }
 
-    .main p, .main label {
-        margin-bottom: 0.25rem !important;
-    }
-
-    .main a { color:#0b57d0 !important; font-weight:600; }
-    .ff-muted { color: rgba(0,0,0,0.68) !important; font-size: 13px; }
-
-    .ff-panel{
-        background: rgba(255,255,255,0.92);
+    .ff-card{
         border: 1px solid rgba(0,0,0,0.08);
         border-radius: 16px;
-        padding: 10px 12px;
-        margin: 6px 0 10px 0;
-        box-shadow: 0 5px 14px rgba(0,0,0,0.05);
-    }
-
-    .ff-result{
-        background: rgba(255,255,255,0.95);
-        border: 1px solid rgba(0,0,0,0.09);
-        border-radius: 18px;
-        padding: 12px 12px 8px 12px;
-        margin: 10px 0 14px 0;
-        box-shadow: 0 6px 16px rgba(0,0,0,0.05);
-    }
-
-    .ff-links{
-        background: rgba(255,255,255,0.90);
-        border: 1px solid rgba(0,0,0,0.08);
-        border-radius: 12px;
-        padding: 8px 10px;
-        margin: 6px 0 8px 0;
-    }
-
-    .ff-meta{
-        background: rgba(255,255,255,0.84);
-        border: 1px solid rgba(0,0,0,0.07);
-        border-radius: 12px;
-        padding: 7px 10px;
-        margin: 6px 0;
-    }
-
-    .ff-stars{position:relative;display:inline-block;font-size:16px;line-height:1;letter-spacing:1px}
-    .ff-stars .bot{color:#d0d0d0;display:block}
-    .ff-stars .top{color:#f5c518;position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;display:block}
-
-    div[data-testid="stExpander"]{
-        border-radius: 12px !important;
-        border: 1px solid rgba(0,0,0,0.08) !important;
-        background: rgba(255,255,255,0.90) !important;
-        margin-top: 6px !important;
-    }
-
-    .stSelectbox [data-baseweb="select"],
-    .stMultiSelect [data-baseweb="select"]{
-        background: rgba(255,255,255,0.96) !important;
-        border-radius: 14px !important;
-        border: 1px solid rgba(0,0,0,0.08) !important;
-        min-height: 44px !important;
-        box-shadow: none !important;
-    }
-
-    .stTextInput [data-baseweb="input"]{
-        background: rgba(255,255,255,0.96) !important;
-        border-radius: 14px !important;
-        border: 1px solid rgba(0,0,0,0.08) !important;
-        min-height: 44px !important;
-        box-shadow: none !important;
-    }
-
-    .stTextInput input{
-        background: transparent !important;
-    }
-
-    .stTextArea textarea{
-        background: rgba(255,255,255,0.96) !important;
-        border-radius: 14px !important;
-        border: 1px solid rgba(0,0,0,0.08) !important;
-        box-shadow: none !important;
-        min-height: 84px !important;
-    }
-
-    .ff-clear-col{
-        display:flex;
-        align-items:flex-end;
-        padding-top: 2px;
-    }
-
-    .ff-clear-col button{
-        min-width: 40px !important;
-        width: 40px !important;
-        height: 40px !important;
-        border-radius: 12px !important;
-        padding: 0 !important;
-    }
-
-    .ff-inline-actors{
-        font-size: 0.96rem;
-        line-height: 1.5;
-        margin-top: 6px;
-    }
-
-    .ff-inline-actors a{
-        color:#0b57d0 !important;
-        text-decoration:none !important;
-        font-weight:500;
-    }
-
-    .ff-inline-actors a:hover{
-        text-decoration:underline !important;
-    }
-
-    .ff-search-actions{
-        margin-top: 4px;
-        margin-bottom: 4px;
-    }
-
-    @media (max-width: 768px){
-        .main .block-container{
-            padding: 10px 10px 18px 10px !important;
-            border-radius: 14px !important;
-        }
-        .ff-panel{
-            padding: 8px 10px;
-            margin: 4px 0 8px 0;
-        }
-        .ff-result{
-            padding: 10px 10px 8px 10px;
-            margin: 8px 0 12px 0;
-        }
-        .main h1{
-            font-size: 2.2rem !important;
-        }
+        padding: 16px 16px 10px 16px;
+        background: #ffffff;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+        margin: 12px 0 18px 0;
     }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
-    js = """
-    <script>
-    function ffBlurAndScroll() {
-        try {
-            if (document.activeElement) document.activeElement.blur();
-            const el = document.getElementById('ff-results-anchor');
-            if (el) {
-                setTimeout(() => {
-                    el.scrollIntoView({behavior: 'smooth', block: 'start'});
-                }, 120);
-            }
-        } catch(e) {}
-    }
-    window.ffBlurAndScroll = ffBlurAndScroll;
-    </script>
-    """
-    st.markdown(js, unsafe_allow_html=True)
-
 apply_theme()
 
 # ================== UTILS ==================
-STOPWORDS = {
-    "le","la","les","un","une","des","de","du","dans","sur","avec","sans","et","ou",
-    "qui","que","quoi","dont","au","aux","en","a","à","pour","par","se","sa","son","ses",
-    "je","tu","il","elle","on","nous","vous","ils","elles","toujours",
-    "the","a","an","and","or","in","on","with","without","to","of","for","by","from"
-}
-
-GENRE_CHOICES = [
-    "Action","Aventure","Animation","Comédie","Crime","Documentaire","Drame",
-    "Famille","Fantasy","Horreur","Mystère","Romance","Science-fiction",
-    "Thriller","Guerre","Western"
-]
-
-YEAR_FILTERS = {
-    "2020-2025": (2020, 2025),
-    "2010-2019": (2010, 2019),
-    "2000-2009": (2000, 2009),
-    "1990-1999": (1990, 1999),
-    "1980-1989": (1980, 1989),
-    "Avant 1980": (1900, 1979),
-}
-
 def norm_text(s: str) -> str:
     if not s:
         return ""
@@ -252,79 +84,18 @@ def norm_text(s: str) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
-def stars_html(score_0_100):
-    if score_0_100 is None:
-        return ""
-    try:
-        pct = max(0.0, min(100.0, float(score_0_100)))
-    except Exception:
-        return ""
-    return (
-        f'<span class="ff-stars">'
-        f'  <span class="top" style="width:{pct}%">★★★★★</span>'
-        f'  <span class="bot">★★★★★</span>'
-        f'</span>'
-    )
-
-def flag_from_iso2(code2: str) -> str:
-    if not code2 or len(code2) != 2:
-        return ""
-    code2 = code2.upper()
-    if not ("A" <= code2[0] <= "Z" and "A" <= code2[1] <= "Z"):
-        return ""
-    return chr(0x1F1E6 + ord(code2[0]) - ord("A")) + chr(0x1F1E6 + ord(code2[1]) - ord("A"))
-
-_COUNTRY_MAP = {
-    "france":"FR","fr":"FR",
-    "united states":"US","usa":"US","us":"US","etats unis":"US","états unis":"US",
-    "united kingdom":"GB","uk":"GB","gb":"GB","royaume uni":"GB",
-    "japan":"JP","japon":"JP","jp":"JP",
-    "korea":"KR","south korea":"KR","corée":"KR","coree":"KR","kr":"KR",
-    "spain":"ES","espagne":"ES","es":"ES",
-    "italy":"IT","italie":"IT","it":"IT",
-    "germany":"DE","allemagne":"DE","de":"DE",
-    "canada":"CA","ca":"CA",
-    "australia":"AU","au":"AU",
-    "china":"CN","chine":"CN","cn":"CN",
-    "india":"IN","inde":"IN","in":"IN",
-    "brazil":"BR","bresil":"BR","brésil":"BR","br":"BR",
-    "mexico":"MX","mexique":"MX","mx":"MX",
-    "russia":"RU","russie":"RU","ru":"RU",
-    "netherlands":"NL","pays bas":"NL","nl":"NL",
-    "ireland":"IE","irlande":"IE","ie":"IE",
-    "belgium":"BE","belgique":"BE","be":"BE",
-    "switzerland":"CH","suisse":"CH","ch":"CH",
-}
-
-def iso2_from_country_text(country_text: str) -> str:
-    if not country_text:
-        return ""
-    first = country_text.split(",")[0].strip()
-    if first.upper() == "USA":
-        return "US"
-    if first.upper() == "UK":
-        return "GB"
-    if len(first) == 2:
-        return first.upper()
-    return _COUNTRY_MAP.get(norm_text(first), "")
-
 # ================== PROFILE ==================
 def load_profile():
     if PROFILE_PATH.exists():
         try:
-            p = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
-            if p.get("show_type") == "all":
-                p["show_type"] = "movie"
-            if p.get("show_type") not in ("movie", "series"):
-                p["show_type"] = "movie"
-            return p
+            return json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
         except Exception:
             pass
     return {
         "pseudo": "",
         "country": "fr",
         "lang": "fr",
-        "show_type": "movie",
+        "show_type": "all",
         "platform_ids": [],
         "show_elsewhere": False,
     }
@@ -343,15 +114,18 @@ def ollama_is_up() -> bool:
         return False
 
 def ollama_pack(description: str):
+    """
+    JSON STRICT + court => rapide
+    {"titles":[...], "queries":[...]}
+    """
     prompt = f"""
 Réponds UNIQUEMENT avec un JSON valide:
 {{"titles":[...], "queries":[...]}}
 
 Règles:
-- Si tu reconnais le titre exact, mets-le en PREMIER dans "titles".
-- titles: 3 à 7 titres max.
-- queries: 4 à 7 requêtes max, courtes.
-- pas de phrases longues.
+- titles: 3 à 6 titres max (courts)
+- queries: 4 à 6 requêtes max (3 à 7 mots), FR/EN
+- PAS de phrases longues
 
 Souvenir: {description}
 """.strip()
@@ -362,12 +136,13 @@ Souvenir: {description}
             "model": OLLAMA_MODEL,
             "prompt": prompt,
             "stream": False,
-            "options": {"temperature": 0.2, "num_predict": 260}
+            "options": {"temperature": 0.2, "num_predict": 220}
         },
-        timeout=70,
+        timeout=60,
     )
     if not r.ok:
         raise RuntimeError(f"Ollama ERROR {r.status_code}: {r.text[:300]}")
+
     txt = (r.json().get("response", "") or "").strip()
     try:
         return json.loads(txt)
@@ -392,13 +167,21 @@ def sa_get(path: str, params: dict):
         timeout=25,
     )
     if not r.ok:
-        raise RuntimeError(f"API ERROR {r.status_code}: {r.text[:300]}")
+        raise RuntimeError(f"API ERROR {r.status_code}: {r.text[:400]}")
     return r.json()
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_services(country: str, lang: str):
     data = sa_get(f"/countries/{country}", {"output_language": lang})
     return data.get("services", []) or []
+
+@st.cache_data(show_spinner=False, ttl=300)
+def api_healthcheck():
+    try:
+        _ = sa_get("/countries/fr", {"output_language": "fr"})
+        return True, "API OK"
+    except Exception as e:
+        return False, str(e)
 
 def stable_id(sh: dict) -> str:
     return str(
@@ -427,27 +210,7 @@ def get_poster_url(show: dict):
     except Exception:
         return None
 
-def search_by_title(title: str, country: str, show_type: str, lang: str):
-    data = sa_get("/shows/search/title", {
-        "title": title,
-        "country": country,
-        "show_type": show_type,
-        "series_granularity": "show",
-        "output_language": lang,
-    })
-    return data if isinstance(data, list) else []
-
-def search_by_keyword(keyword: str, country: str, show_type: str, lang: str):
-    res = sa_get("/shows/search/filters", {
-        "country": country,
-        "show_type": show_type,
-        "keyword": keyword,
-        "series_granularity": "show",
-        "output_language": lang,
-    })
-    return res.get("shows", []) if isinstance(res, dict) else []
-
-# ================== OMDb ==================
+# ================== OMDb (notes critiques) ==================
 @st.cache_data(show_spinner=False, ttl=86400)
 def omdb_fetch(imdb_id: str):
     if not OMDB_API_KEY or not imdb_id:
@@ -467,7 +230,12 @@ def omdb_fetch(imdb_id: str):
         return None
     return None
 
-def critic_score_and_sources(show: dict):
+def parse_critic_scores(show: dict):
+    """
+    Retour:
+    (display_str, score_0_100 or None)
+    Priorité: RT% > Metascore > IMDb*10 > rating API si présent
+    """
     api_rating = show.get("rating", None)
     api_score = float(api_rating) if isinstance(api_rating, (int, float)) else None
 
@@ -499,14 +267,14 @@ def critic_score_and_sources(show: dict):
             pass
 
     parts = []
-    if imdb is not None:
-        parts.append(f"IMDb {imdb:.1f}/10")
-    if meta is not None:
-        parts.append(f"Meta {meta}/100")
     if rt is not None:
-        parts.append(f"RT {rt}%")
+        parts.append(f"🍅 {rt}%")
+    if meta is not None:
+        parts.append(f"📰 {meta}/100")
+    if imdb is not None:
+        parts.append(f"⭐ {imdb:.1f}/10")
     if not parts and api_score is not None:
-        parts.append(f"Score {int(api_score)}/100")
+        parts.append(f"📊 {int(api_score)}/100")
 
     if rt is not None:
         score = float(rt)
@@ -519,33 +287,16 @@ def critic_score_and_sources(show: dict):
     else:
         score = None
 
-    return score, (" · ".join(parts) if parts else "")
+    return (" · ".join(parts) if parts else ""), score
 
-def actors_list_from_omdb(show: dict):
-    imdb_id = show.get("imdbId") or show.get("imdbID") or None
-    data = omdb_fetch(imdb_id) if imdb_id else None
-    if not data:
-        return []
-    a = data.get("Actors")
-    if isinstance(a, str) and a.strip() and a.strip().upper() != "N/A":
-        return [x.strip() for x in a.split(",") if x.strip()]
-    return []
-
-def country_from_omdb(show: dict) -> str:
-    imdb_id = show.get("imdbId") or show.get("imdbID") or None
-    data = omdb_fetch(imdb_id) if imdb_id else None
-    if not data:
-        return ""
-    c = data.get("Country")
-    if isinstance(c, str) and c.strip() and c.strip().upper() != "N/A":
-        return c.strip()
-    return ""
-
-# ================== TNT ==================
+# ================== TNT (XMLTVFr) ==================
 def _candidate_xmltv_urls():
+    # si l'utilisateur fournit XMLTV_TNT_URL dans .env -> priorité
     urls = []
     if XMLTV_TNT_URL:
         urls.append(XMLTV_TNT_URL)
+
+    # tentatives par défaut (gz puis xml)
     urls += [
         "https://xmltvfr.fr/xmltv/xmltv_tnt.xml.gz",
         "https://xmltvfr.fr/xmltv/xmltv_tnt.xml",
@@ -554,11 +305,17 @@ def _candidate_xmltv_urls():
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def tnt_load_index():
+    """
+    Télécharge le XMLTV TNT (XMLTVFr), parse, et construit:
+    - channel_names: dict channel_id -> display-name
+    - title_index: dict normalized_title -> list of airings
+      airing = (start_dt_iso, stop_dt_iso, channel_id)
+    """
     headers = {"User-Agent": "Mozilla/5.0 FilmFinderIA/1.0"}
-    content = None
-    used_url = None
     last_err = None
 
+    content = None
+    used_url = None
     for url in _candidate_xmltv_urls():
         try:
             r = requests.get(url, headers=headers, timeout=30)
@@ -571,17 +328,25 @@ def tnt_load_index():
             last_err = f"{url} -> {e}"
 
     if content is None:
-        raise RuntimeError(f"Impossible de récupérer le guide TNT. Dernière erreur: {last_err}")
+        raise RuntimeError(f"Impossible de récupérer le guide TNT (XMLTV). Dernière erreur: {last_err}")
 
+    # décompression gzip si nécessaire
     if used_url.endswith(".gz") or (len(content) > 2 and content[0] == 0x1F and content[1] == 0x8B):
-        content = gzip.decompress(content)
+        try:
+            content = gzip.decompress(content)
+        except Exception:
+            # fallback via GzipFile
+            with gzip.GzipFile(fileobj=io.BytesIO(content)) as gz:
+                content = gz.read()
 
+    # parsing XML
     channel_names = {}
     title_index = {}
 
     now = datetime.now(timezone.utc)
     end = now + timedelta(days=max(1, TNT_LOOKAHEAD_DAYS))
 
+    # iterparse pour éviter de charger tout en mémoire
     for event, elem in ET.iterparse(io.BytesIO(content), events=("end",)):
         if elem.tag == "channel":
             cid = elem.attrib.get("id", "")
@@ -599,6 +364,7 @@ def tnt_load_index():
             start_s = elem.attrib.get("start", "")
             stop_s = elem.attrib.get("stop", "")
 
+            # exemple: 20211227234500 +0100
             def parse_dt(s):
                 try:
                     return datetime.strptime(s, "%Y%m%d%H%M%S %z")
@@ -611,11 +377,13 @@ def tnt_load_index():
                 elem.clear()
                 continue
 
+            # filtre fenêtre temps (utc)
             start_utc = start_dt.astimezone(timezone.utc)
             if start_utc < now or start_utc > end:
                 elem.clear()
                 continue
 
+            # titre
             title = None
             for t in elem.findall("title"):
                 if t.text:
@@ -627,36 +395,51 @@ def tnt_load_index():
 
             key = norm_text(title)
             if key:
-                title_index.setdefault(key, []).append((start_dt.isoformat(), stop_dt.isoformat(), ch))
+                title_index.setdefault(key, []).append((
+                    start_dt.isoformat(),
+                    stop_dt.isoformat(),
+                    ch
+                ))
             elem.clear()
 
+    # tri interne par date
     for k in list(title_index.keys()):
         title_index[k].sort(key=lambda x: x[0])
-        title_index[k] = title_index[k][:10]
+        title_index[k] = title_index[k][:12]  # limite par titre
 
     return channel_names, title_index
 
-def tnt_find_airings(title_variants, limit=2):
+def tnt_find_airings(title_variants, limit=3):
+    """
+    title_variants: list[str]
+    retourne list[dict]: channel_name, start, stop
+    """
     try:
         channel_names, idx = tnt_load_index()
     except Exception:
         return []
 
-    keys = [norm_text(t) for t in title_variants if t]
-    keys = [k for k in keys if k]
+    # exact
+    keys = []
+    for t in title_variants:
+        k = norm_text(t)
+        if k:
+            keys.append(k)
 
     matches = []
     for k in keys:
         if k in idx:
             matches += idx[k]
 
-    if not matches and idx and keys:
+    # fuzzy si rien
+    if not matches and idx:
         all_keys = list(idx.keys())
         for k in keys:
-            close = difflib.get_close_matches(k, all_keys, n=2, cutoff=0.92)
+            close = difflib.get_close_matches(k, all_keys, n=2, cutoff=0.90)
             for ck in close:
                 matches += idx.get(ck, [])
 
+    # dédoublonnage + tri
     uniq = []
     seen = set()
     for s, e, ch in matches:
@@ -673,24 +456,65 @@ def tnt_find_airings(title_variants, limit=2):
             sdt = datetime.fromisoformat(s)
             edt = datetime.fromisoformat(e)
             out.append({
+                "channel_id": ch,
                 "channel": channel_names.get(ch, ch),
                 "start": sdt.strftime("%d/%m %H:%M"),
                 "stop": edt.strftime("%H:%M"),
+                "url": f"https://xmltvfr.fr/xmltvreader.php?channel={ch}",
             })
         except Exception:
             continue
     return out
 
 # ================== SEARCH HELPERS ==================
+def score_relevance(sh, qtext):
+    t = ((sh.get("title") or "") + " " + (sh.get("overview") or "")).lower()
+    words = [w for w in re.findall(r"[a-zA-ZÀ-ÿ0-9']+", qtext.lower()) if len(w) >= 4]
+    return sum(1 for w in set(words) if w in t)
+
 def merge_results(items):
     merged = {}
     for sh in items:
         merged[stable_id(sh)] = sh
     return list(merged.values())
 
+def search_by_title(title: str, country: str, show_type: str, lang: str):
+    type_param = None if show_type == "all" else show_type
+    data = sa_get(
+        "/shows/search/title",
+        {
+            "title": title,
+            "country": country,
+            "show_type": type_param,
+            "series_granularity": "show",
+            "output_language": lang,
+        },
+    )
+    return data if isinstance(data, list) else []
+
+def search_by_keyword(keyword: str, country: str, show_type: str, lang: str):
+    type_param = None if show_type == "all" else show_type
+    res = sa_get(
+        "/shows/search/filters",
+        {
+            "country": country,
+            "show_type": type_param,
+            "keyword": keyword,
+            "series_granularity": "show",
+            "output_language": lang,
+        },
+    )
+    return res.get("shows", []) if isinstance(res, dict) else []
+
 def extract_keywords(text: str, max_words: int = 10) -> str:
+    stop = {
+        "le","la","les","un","une","des","de","du","dans","sur","avec","sans","et","ou",
+        "qui","que","quoi","dont","au","aux","en","a","à","pour","par","se","sa","son","ses",
+        "je","tu","il","elle","on","nous","vous","ils","elles","toujours",
+        "the","a","an","and","or","in","on","with","without","to","of","for","by","from",
+    }
     words = re.findall(r"[a-zA-ZÀ-ÿ0-9']+", text.lower())
-    words = [w for w in words if len(w) >= 4 and w not in STOPWORDS]
+    words = [w for w in words if len(w) >= 4 and w not in stop]
     out = []
     for w in words:
         if w not in out:
@@ -699,116 +523,41 @@ def extract_keywords(text: str, max_words: int = 10) -> str:
             break
     return " ".join(out) if out else text.strip()
 
-def heuristic_titles_from_query(q: str):
-    nq = norm_text(q)
-    titles = []
-    time_loop = any(x in nq for x in ["boucle", "revit", "revivre", "meme journee", "même journée", "rena", "ressusc", "time loop", "loop"])
-    tom = "tom cruise" in nq
-    alien = any(x in nq for x in ["extraterrestre", "alien"])
-    if time_loop:
-        titles += ["Edge of Tomorrow", "Un jour sans fin", "Happy Death Day", "Palm Springs"]
-    if tom:
-        titles.insert(0, "Edge of Tomorrow")
-        titles += ["Live Die Repeat"]
-    if alien and time_loop and "Edge of Tomorrow" not in titles:
-        titles.insert(0, "Edge of Tomorrow")
-    out = []
+# ================== ACCUEIL: affiche ==================
+@st.cache_data(show_spinner=False, ttl=3600)
+def get_home_poster(country: str, lang: str):
+    titles = [
+        "Inception", "The Matrix", "Interstellar", "Titanic", "Gladiator",
+        "Avatar", "The Godfather", "Pulp Fiction", "The Dark Knight",
+        "Forrest Gump", "Jurassic Park"
+    ]
+    random.shuffle(titles)
     for t in titles:
-        if t not in out:
-            out.append(t)
-    return out
+        try:
+            res = search_by_title(t, country=country, show_type="movie", lang=lang)
+            if res:
+                url = get_poster_url(res[0])
+                if url:
+                    return url, res[0].get("title", t)
+        except Exception:
+            pass
+    return None, None
 
-def relevance_score(sh: dict, q: str, actor_hint: str = "") -> float:
-    hay = norm_text((sh.get("title") or "") + " " + (sh.get("overview") or ""))
-    qn = norm_text(q)
-
-    words = [w for w in qn.split() if len(w) >= 4 and w not in STOPWORDS]
-    score = 0.0
-    for w in set(words):
-        if w in hay:
-            score += 1.0
-
-    if any(x in qn for x in ["boucle", "revit", "revivre", "meme journee", "même journée", "ressusc", "rena"]):
-        if any(x in hay for x in ["loop", "time loop", "revit", "revivre", "ressusc", "rena", "day repeats", "repeat the day"]):
-            score += 3.0
-
-    if any(x in qn for x in ["extraterrestre", "alien"]):
-        if any(x in hay for x in ["alien", "extraterrestre", "invasion", "space", "military operation against aliens"]):
-            score += 2.2
-
-    if actor_hint:
-        actors = " ".join([norm_text(a) for a in actors_list_from_omdb(sh)])
-        if actor_hint in actors:
-            score += 4.0
-
-    title_n = norm_text(sh.get("title", ""))
-    if "edge of tomorrow" in title_n or "live die repeat" in title_n:
-        if any(x in qn for x in ["tom cruise", "extraterrestre", "revit", "rena", "ressusc", "journee", "journée", "loop"]):
-            score += 4.0
-
-    return score
-
-def genre_match(show, selected_genres):
-    if not selected_genres:
-        return True
-    txt = norm_text(json.dumps(show.get("genres", ""), ensure_ascii=False))
-    title_overview = norm_text((show.get("title") or "") + " " + (show.get("overview") or ""))
-    hay = txt + " " + title_overview
-
-    mapping = {
-        "Science-fiction": ["science fiction", "science-fiction", "sci-fi", "scifi"],
-        "Comédie": ["comedie", "comédie", "comedy"],
-        "Drame": ["drame", "drama"],
-        "Horreur": ["horreur", "horror"],
-        "Aventure": ["aventure", "adventure"],
-        "Mystère": ["mystere", "mystère", "mystery"],
-    }
-
-    for g in selected_genres:
-        toks = mapping.get(g, [norm_text(g)])
-        if any(tok in hay for tok in toks):
-            return True
-    return False
-
-def year_match(year_value, selected_year_ranges):
-    if not selected_year_ranges:
-        return True
-    try:
-        y = int(year_value)
-    except Exception:
-        return False
-    for start, end in selected_year_ranges:
-        if start <= y <= end:
-            return True
-    return False
-
-# ================== STATE ==================
+# ================== MENU / STATE ==================
 st.session_state.setdefault("entered", False)
 st.session_state.setdefault("page", "Accueil")
 st.session_state.setdefault("do_search", False)
 st.session_state.setdefault("last_results", None)
 st.session_state.setdefault("last_query", "")
-st.session_state.setdefault("last_mode", "Normal")
-st.session_state.setdefault("actor_search", "")
-st.session_state.setdefault("sort_mode", "Pertinence")
-st.session_state.setdefault("scroll_to_results", False)
+st.session_state.setdefault("tnt_cache", {})  # show_id -> list airings
 
-# gestion clic acteur via query string
-qp_actor = st.query_params.get("actor")
-if isinstance(qp_actor, list):
-    qp_actor = qp_actor[0] if qp_actor else ""
-if qp_actor:
-    actor_clicked = str(qp_actor).strip()
-    if actor_clicked:
-        st.session_state["actor_search"] = actor_clicked
-        st.session_state["do_search"] = True
-        st.session_state["scroll_to_results"] = True
-        st.session_state["sort_mode"] = "Note (haute)"
-        st.query_params.clear()
-
-# ================== SIDEBAR ==================
 with st.sidebar:
+    ok, msg = api_healthcheck()
     st.markdown("## FilmFinder IA")
+    st.caption("✅ " + msg if ok else "❌ " + msg)
+    st.caption("🤖 IA locale : " + ("ON" if ollama_is_up() else "OFF"))
+    st.caption("📝 Notes critiques : " + ("ON (OMDb)" if OMDB_API_KEY else "OFF (optionnel)"))
+
     if st.session_state["entered"]:
         st.radio("Menu", ["Recherche", "Profil"], key="page")
     else:
@@ -817,71 +566,99 @@ with st.sidebar:
 # ================== ACCUEIL ==================
 if st.session_state["page"] == "Accueil":
     st.markdown("# FilmFinder IA")
-    st.caption("Souvenir flou → titres probables → où regarder.")
+    st.caption("Souvenir flou → titres probables → où regarder (liens).")
+
+    if RAPIDAPI_KEY:
+        poster_url, poster_title = get_home_poster(country=profile.get("country","fr"), lang=profile.get("lang","fr"))
+        if poster_url:
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                st.image(poster_url, width=210)
+            with c2:
+                st.markdown("### 🍿 Bienvenue")
+                st.caption(f"Affiche aléatoire : **{poster_title}**")
+
+    st.markdown('<div class="ff-card">', unsafe_allow_html=True)
+    st.markdown("### Inscription rapide")
+    st.caption("Pas de nom/prénom. Juste ce qui sert à filtrer la recherche.")
 
     if not RAPIDAPI_KEY:
         st.error("RAPIDAPI_KEY manquante dans .env (RapidAPI).")
         st.stop()
 
     with st.form("signup_form"):
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            country = st.selectbox("Pays", ["fr", "be", "ch", "gb", "us"], index=["fr","be","ch","gb","us"].index(profile.get("country","fr")))
-        with c2:
-            lang = st.selectbox("Langue", ["fr", "en"], index=["fr","en"].index(profile.get("lang","fr")))
-        with c3:
-            typ = st.selectbox("Type", ["Film", "Série"], index=0 if profile.get("show_type","movie")=="movie" else 1)
-        with c4:
-            show_elsewhere = st.checkbox("Ailleurs", value=bool(profile.get("show_elsewhere", False)))
+        pseudo = st.text_input("Pseudo (optionnel)", value=profile.get("pseudo", ""))
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            country = st.selectbox("Pays", ["fr","be","ch","gb","us"], index=["fr","be","ch","gb","us"].index(profile.get("country","fr")))
+        with col2:
+            lang = st.selectbox("Langue", ["fr","en"], index=["fr","en"].index(profile.get("lang","fr")))
+        with col3:
+            show_type = st.selectbox("Type", ["all","movie","series"], index=["all","movie","series"].index(profile.get("show_type","all")))
 
         services = get_services(country, lang)
         name_to_id = {(s.get("name") or s.get("id")): s.get("id") for s in services if (s.get("name") or s.get("id")) and s.get("id")}
         id_to_name = {v: k for k, v in name_to_id.items()}
+
         default_names = [id_to_name[i] for i in profile.get("platform_ids", []) if i in id_to_name]
+        if not default_names:
+            for wanted in ["Netflix","Prime Video","Disney+","Apple TV+","Max","HBO Max"]:
+                if wanted in name_to_id:
+                    default_names.append(wanted)
+
         chosen_names = st.multiselect("Tes plateformes", options=sorted(name_to_id.keys()), default=sorted(set(default_names)))
         platform_ids = [name_to_id[n] for n in chosen_names]
 
+        show_elsewhere = st.checkbox("Si pas dispo sur mes applis, montrer ailleurs", value=bool(profile.get("show_elsewhere", False)))
+
         enter_btn = st.form_submit_button("Entrer")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if enter_btn:
         if not platform_ids:
             st.warning("Coche au moins 1 plateforme 🙂")
         else:
             profile = {
-                "pseudo": "",
+                "pseudo": pseudo.strip(),
                 "country": country,
                 "lang": lang,
-                "show_type": "movie" if typ == "Film" else "series",
+                "show_type": show_type,
                 "platform_ids": platform_ids,
-                "show_elsewhere": bool(show_elsewhere),
+                "show_elsewhere": show_elsewhere,
             }
             save_profile(profile)
             st.session_state["entered"] = True
             st.session_state["page"] = "Recherche"
             st.rerun()
+
     st.stop()
 
 # ================== PROFIL ==================
 if st.session_state["page"] == "Profil":
-    st.markdown("## Profil")
+    st.markdown("# Profil")
 
     with st.form("profile_form"):
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            country = st.selectbox("Pays", ["fr", "be", "ch", "gb", "us"], index=["fr","be","ch","gb","us"].index(profile.get("country","fr")))
-        with c2:
-            lang = st.selectbox("Langue", ["fr", "en"], index=["fr","en"].index(profile.get("lang","fr")))
-        with c3:
-            typ = st.selectbox("Type", ["Film", "Série"], index=0 if profile.get("show_type","movie")=="movie" else 1)
-        with c4:
-            show_elsewhere = st.checkbox("Ailleurs", value=bool(profile.get("show_elsewhere", False)))
+        pseudo = st.text_input("Pseudo (optionnel)", value=profile.get("pseudo", ""))
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            country = st.selectbox("Pays", ["fr","be","ch","gb","us"], index=["fr","be","ch","gb","us"].index(profile.get("country","fr")))
+        with col2:
+            lang = st.selectbox("Langue", ["fr","en"], index=["fr","en"].index(profile.get("lang","fr")))
+        with col3:
+            show_type = st.selectbox("Type", ["all","movie","series"], index=["all","movie","series"].index(profile.get("show_type","all")))
 
         services = get_services(country, lang)
         name_to_id = {(s.get("name") or s.get("id")): s.get("id") for s in services if (s.get("name") or s.get("id")) and s.get("id")}
         id_to_name = {v: k for k, v in name_to_id.items()}
+
         default_names = [id_to_name[i] for i in profile.get("platform_ids", []) if i in id_to_name]
         chosen_names = st.multiselect("Tes plateformes", options=sorted(name_to_id.keys()), default=sorted(set(default_names)))
         platform_ids = [name_to_id[n] for n in chosen_names]
+
+        show_elsewhere = st.checkbox("Si pas dispo sur mes applis, montrer ailleurs", value=bool(profile.get("show_elsewhere", False)))
 
         ok_btn = st.form_submit_button("✅ Enregistrer")
 
@@ -890,12 +667,12 @@ if st.session_state["page"] == "Profil":
             st.warning("Coche au moins 1 plateforme 🙂")
         else:
             profile = {
-                "pseudo": "",
+                "pseudo": pseudo.strip(),
                 "country": country,
                 "lang": lang,
-                "show_type": "movie" if typ == "Film" else "series",
+                "show_type": show_type,
                 "platform_ids": platform_ids,
-                "show_elsewhere": bool(show_elsewhere),
+                "show_elsewhere": show_elsewhere,
             }
             save_profile(profile)
             st.success("Profil enregistré.")
@@ -906,369 +683,206 @@ if st.session_state["page"] == "Profil":
 # ================== RECHERCHE ==================
 st.markdown("# Recherche")
 
-if not profile.get("platform_ids"):
-    st.warning("Crée ton profil avant de chercher.")
-    st.stop()
-
-MODE_PRESETS = {
-    "Rapide":  {"titles_max": 2, "queries_max": 2, "en_if_under": 6,  "pool": 40,  "omdb_top": 12},
-    "Normal":  {"titles_max": 4, "queries_max": 4, "en_if_under": 8,  "pool": 70,  "omdb_top": 18},
-    "Profond": {"titles_max": 7, "queries_max": 7, "en_if_under": 999, "pool": 120, "omdb_top": 25},
-}
-mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1)
-preset = MODE_PRESETS[mode]
-
-if st.session_state.get("actor_search"):
-    actor = st.session_state["actor_search"]
-    st.markdown(f"<div class='ff-muted'>Recherche acteur : <b>{actor}</b> — tri par note</div>", unsafe_allow_html=True)
-    st.session_state["sort_mode"] = "Note (haute)"
-    if st.button("⬅️ Retour recherche normale"):
-        st.session_state["actor_search"] = ""
-        st.session_state["last_results"] = None
-        st.session_state["scroll_to_results"] = False
-        st.rerun()
-
 def trigger_search():
     st.session_state["do_search"] = True
-    st.session_state["scroll_to_results"] = True
 
-st.markdown("<div class='ff-panel'>", unsafe_allow_html=True)
-
-st.markdown("<div id='ff-top-anchor'></div>", unsafe_allow_html=True)
-
-st.markdown("Ton souvenir (Entrée lance)")
-c_input1, c_clear1 = st.columns([16, 1], vertical_alignment="bottom")
-with c_input1:
-    q_main = st.text_input(
-        "Ton souvenir (Entrée lance)",
-        key="q_main",
-        label_visibility="collapsed",
-        on_change=trigger_search,
-        placeholder="Ex: homme extraterrestre renaît"
-    )
-with c_clear1:
-    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    if st.button("✕", key="clear_q_main", help="Vider le souvenir"):
-        st.session_state["q_main"] = ""
-        st.session_state["scroll_to_results"] = False
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-st.markdown("<div class='ff-search-actions'>", unsafe_allow_html=True)
-if st.button("Trouver", type="primary"):
-    st.session_state["do_search"] = True
-    st.session_state["scroll_to_results"] = True
-st.markdown("</div>", unsafe_allow_html=True)
-
-st.markdown("Détails (optionnel)")
-c_input2, c_clear2 = st.columns([16, 1], vertical_alignment="bottom")
-with c_input2:
-    q_more = st.text_area(
-        "Détails (optionnel)",
-        key="q_more",
-        label_visibility="collapsed",
-        height=84,
-        placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…"
-    )
-with c_clear2:
-    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    if st.button("✕", key="clear_q_more", help="Vider les détails"):
-        st.session_state["q_more"] = ""
-        st.session_state["scroll_to_results"] = False
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-selected_genres = []
-selected_year_ranges = []
-
-with st.expander("Filtres", expanded=False):
-    col_left, col_right = st.columns(2)
-
-    with col_left:
-        st.markdown("**Genres**")
-        for g in GENRE_CHOICES:
-            if st.checkbox(g, key=f"genre_{g}"):
-                selected_genres.append(g)
-
-    with col_right:
-        st.markdown("**Années**")
-        for label, yr in YEAR_FILTERS.items():
-            if st.checkbox(label, key=f"year_{label}"):
-                selected_year_ranges.append(yr)
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-sort_mode = st.selectbox(
-    "Trier par",
-    ["Pertinence", "Année (récent)", "Note (haute)"],
-    index=["Pertinence", "Année (récent)", "Note (haute)"].index(st.session_state.get("sort_mode", "Pertinence"))
+q_main = st.text_input(
+    "Ton souvenir (Entrée lance la recherche)",
+    key="q_main",
+    on_change=trigger_search,
+    placeholder="Ex: un homme se perd dans la forêt…"
 )
-st.session_state["sort_mode"] = sort_mode
 
-only_my_apps = st.checkbox("Uniquement sur mes applis", value=False)
+with st.expander("Ajouter des détails (optionnel)"):
+    q_more = st.text_area("Détails", key="q_more", height=90)
 
-# recherche
+if st.button("Trouver"):
+    st.session_state["do_search"] = True
+
+# --- lance une nouvelle recherche ---
 if st.session_state["do_search"]:
     st.session_state["do_search"] = False
-
-    country = profile["country"]
-    lang = profile["lang"]
-    show_type = profile["show_type"]
-
-    actor_search_value = st.session_state.get("actor_search", "").strip()
-    if actor_search_value:
-        show_type = "movie"
-
-    q = (st.session_state.get("q_main", "").strip() + " " + st.session_state.get("q_more", "").strip()).strip()
-    if actor_search_value:
-        q = actor_search_value
+    q = (q_main.strip() + " " + q_more.strip()).strip()
 
     if not q:
         st.warning("Écris au moins une phrase 🙂")
         st.stop()
 
-    titles = heuristic_titles_from_query(q)
-    queries = []
+    country = profile["country"]
+    lang = profile["lang"]
+    show_type = profile["show_type"]
 
-    if ollama_is_up() and not actor_search_value:
+    titles = []
+    queries = []
+    errors = []
+
+    # IA locale -> pack de requêtes (rapide)
+    if ollama_is_up():
         try:
             pack = ollama_pack(q)
-            titles += pack.get("titles", []) or []
+            titles = pack.get("titles", []) or []
             queries = pack.get("queries", []) or []
-        except Exception:
-            pass
+        except Exception as e:
+            errors.append(f"IA locale: {e}")
 
+    # fallback sans IA
     if not queries:
         queries = [extract_keywords(q), q]
 
-    qn = norm_text(q)
-    actor_hint = ""
-    if "tom cruise" in qn:
-        actor_hint = "tom cruise"
-    else:
-        bigrams = re.findall(r"[a-z]+ [a-z]+", qn)
-        if bigrams:
-            actor_hint = bigrams[0]
-
-    titles = [x for i, x in enumerate(titles) if x and x not in titles[:i]]
-    queries = [x for i, x in enumerate(queries) if x and x not in queries[:i]]
+    TITLES_MAX = 4
+    QUERIES_MAX = 4
 
     found = []
 
-    for t in titles[:preset["titles_max"]]:
+    # 1) Titres
+    for t in titles[:TITLES_MAX]:
         try:
             found += search_by_title(t, country, show_type, lang)
-        except Exception:
-            pass
+        except Exception as e:
+            errors.append(str(e))
 
-    for kw in queries[:preset["queries_max"]]:
+    # 2) Keywords FR
+    for kw in queries[:QUERIES_MAX]:
         try:
             found += search_by_keyword(kw, country, show_type, lang)
-        except Exception:
-            pass
+        except Exception as e:
+            errors.append(str(e))
 
-    if (not actor_search_value) and len(found) < preset["en_if_under"]:
-        for kw in queries[:preset["queries_max"]]:
+    # 3) Keywords EN seulement si on a trop peu
+    if len(found) < 8:
+        for kw in queries[:QUERIES_MAX]:
             try:
                 found += search_by_keyword(kw, country, show_type, "en")
-            except Exception:
-                pass
+            except Exception as e:
+                errors.append(str(e))
 
     found = merge_results(found)
+    found.sort(key=lambda sh: score_relevance(sh, q), reverse=True)
+    found = found[:60]  # pool raisonnable
 
-    if actor_search_value:
-        actor_norm = norm_text(actor_search_value)
-        actor_filtered = []
-        for sh in found:
-            actors_norm = " ".join(norm_text(a) for a in actors_list_from_omdb(sh))
-            if actor_norm and actor_norm in actors_norm:
-                actor_filtered.append(sh)
-        if actor_filtered:
-            found = actor_filtered
+    st.session_state["last_results"] = found
+    st.session_state["last_query"] = q
+    st.session_state["last_errors"] = errors
 
-    allowed_services = set(profile.get("platform_ids", []))
+# --- affichage (tri + note + TNT) ---
+results = st.session_state.get("last_results")
+if results is not None:
+    q = st.session_state.get("last_query", "")
+    errors = st.session_state.get("last_errors", [])
+
+    if errors:
+        st.warning("⚠️ Debug (utile si ça bug) :\n- " + "\n- ".join(errors[:2]))
+
+    st.caption(f"Requête: {q}")
+
+    sort_mode = st.selectbox("Trier par", ["Pertinence", "Année (récent)", "Note (haute)"], index=0)
+    tnt_enabled = st.checkbox("📺 Chercher aussi sur TNT (5 jours) — plus long", value=False)
+
+    # Pré-calcul notes pour tri (limité)
     enriched = []
-
-    for i, sh in enumerate(found):
-        opts_all = ((sh.get("streamingOptions") or {}).get(country) or [])
-        opts_all = dedupe_streaming_options(opts_all)
-        opts_mine = [o for o in opts_all if ((o.get("service") or {}).get("id") in allowed_services)]
-        opts_mine = dedupe_streaming_options(opts_mine)
-        is_mine = 1 if opts_mine else 0
-
-        rel = relevance_score(sh, q, actor_hint=actor_hint)
-        rel += 0.30 * is_mine
-
+    for i, sh in enumerate(results):
         year = sh.get("releaseYear") or sh.get("firstAirYear") or 0
         try:
             year = int(year) if year else 0
         except Exception:
             year = 0
 
-        score100 = None
-        sources = ""
-        if i < preset["omdb_top"]:
-            score100, sources = critic_score_and_sources(sh)
+        note_str = ""
+        note_score = None
+        if i < 25:
+            note_str, note_score = parse_critic_scores(sh)
         else:
             if isinstance(sh.get("rating"), (int, float)):
-                score100 = float(sh["rating"])
-                sources = f"Score {int(score100)}/100"
+                note_score = float(sh["rating"])
+                note_str = f"📊 {int(note_score)}/100"
 
-        enriched.append({
-            "show": sh,
-            "rel": rel,
-            "year": year,
-            "score100": score100,
-            "sources": sources,
-            "is_mine": is_mine,
-        })
+        enriched.append((sh, year, note_score, note_str))
 
-    # filtres genres + années
-    if selected_genres:
-        keep = [x for x in enriched if genre_match(x["show"], selected_genres)]
-        enriched = keep if keep else enriched
-
-    if selected_year_ranges:
-        keep = [x for x in enriched if year_match(x["year"], selected_year_ranges)]
-        enriched = keep if keep else enriched
-
-    if only_my_apps:
-        keep = [x for x in enriched if x["is_mine"] == 1]
-        enriched = keep if keep else enriched
-
-    if sort_mode == "Pertinence":
-        enriched.sort(key=lambda x: (x["rel"], x["is_mine"]), reverse=True)
-    elif sort_mode == "Année (récent)":
-        enriched.sort(key=lambda x: (x["year"], x["is_mine"]), reverse=True)
+    if sort_mode == "Année (récent)":
+        enriched.sort(key=lambda x: x[1], reverse=True)
+    elif sort_mode == "Note (haute)":
+        enriched.sort(key=lambda x: (x[2] is not None, x[2] or -1), reverse=True)
     else:
-        enriched.sort(key=lambda x: ((x["score100"] is not None), (x["score100"] or -1), x["is_mine"]), reverse=True)
+        pass  # déjà trié pertinence
 
-    st.session_state["last_results"] = enriched[:preset["pool"]]
-    st.session_state["last_query"] = q
-    st.session_state["last_mode"] = mode
-
-
-# affichage
-results = st.session_state.get("last_results")
-if results is not None:
-    st.markdown("<div id='ff-results-anchor'></div>", unsafe_allow_html=True)
-    if st.session_state.get("scroll_to_results"):
-        components.html(
-            """
-            <script>
-            setTimeout(() => {
-                try {
-                    if (window.parent && window.parent.document && window.parent.document.activeElement) {
-                        window.parent.document.activeElement.blur();
-                    }
-                    const el = window.parent.document.getElementById('ff-results-anchor');
-                    if (el) {
-                        el.scrollIntoView({behavior:'smooth', block:'start'});
-                    }
-                } catch(e) {}
-            }, 220);
-            </script>
-            """,
-            height=0,
-        )
-        st.session_state["scroll_to_results"] = False
-    st.markdown(f"<div class='ff-muted'>Requête : {st.session_state.get('last_query','')} — Mode : {st.session_state.get('last_mode','')}</div>", unsafe_allow_html=True)
-    st.write(f"✅ Résultats : {min(len(results),20)} / {len(results)}")
+    st.write(f"✅ Résultats : {len(enriched)} (affichage des 20 premiers)")
 
     country = profile["country"]
     allowed_services = set(profile.get("platform_ids", []))
     show_elsewhere = bool(profile.get("show_elsewhere", False))
 
-    for idx, item in enumerate(results[:20]):
-        sh = item["show"]
+    for sh, year, note_score, note_str in enriched[:20]:
+        sid = stable_id(sh)
         title = sh.get("title", "Sans titre")
-        year = item["year"]
-        score100 = item["score100"]
-        sources = item["sources"]
-        poster = get_poster_url(sh)
         overview = sh.get("overview", "")
+        poster = get_poster_url(sh)
 
-        opts_all = ((sh.get("streamingOptions") or {}).get(country) or [])
-        opts_all = dedupe_streaming_options(opts_all)
-        opts_mine = [o for o in opts_all if ((o.get("service") or {}).get("id") in allowed_services)]
-        opts_mine = dedupe_streaming_options(opts_mine)
-
-        ctxt = country_from_omdb(sh) if OMDB_API_KEY else ""
-        iso = iso2_from_country_text(ctxt) if ctxt else ""
-        flag = flag_from_iso2(iso) if iso else ""
-        country_label = ctxt.split(",")[0].strip() if ctxt else ""
-
-        airings = []
-        if idx < 10:
-            title_variants = [title]
-            if sh.get("originalTitle"):
-                title_variants.append(sh["originalTitle"])
-            airings = tnt_find_airings(title_variants, limit=2)
-
-        st.markdown("<div class='ff-result'>", unsafe_allow_html=True)
+        # variantes de titre pour TNT (titre + original si dispo)
+        title_variants = [title]
+        if sh.get("originalTitle"):
+            title_variants.append(sh["originalTitle"])
 
         c_img, c_txt = st.columns([1, 3])
         with c_img:
             if poster:
                 st.image(poster, width=140)
+            else:
+                st.markdown("🎞️")
 
         with c_txt:
-            st.markdown(f"### {title} ({year if year else ''})")
+            line = f"### {title} ({year if year else ''})"
+            if note_str:
+                line += f" — {note_str}"
+            st.markdown(line)
 
-            star = stars_html(score100)
-            if star:
-                score5 = None if score100 is None else round(float(score100) / 20.0, 1)
-                label = "" if score5 is None else f"<span class='ff-muted' style='margin-left:8px'>({score5}/5)</span>"
-                fl = f"<span class='ff-muted' style='margin-left:10px'>{flag} {country_label}</span>" if (flag or country_label) else ""
-                st.markdown(f"{star}{label}{fl}", unsafe_allow_html=True)
+            # TNT (sur demande + cache)
+            if tnt_enabled:
+                airings = st.session_state["tnt_cache"].get(sid)
+                if airings is None:
+                    if st.button("📺 Chercher TNT", key=f"tnt_{sid}"):
+                        airings = tnt_find_airings(title_variants, limit=3)
+                        st.session_state["tnt_cache"][sid] = airings
+                        st.rerun()
+                else:
+                    if airings:
+                        st.markdown("**📺 TNT (prochaines diffusions)**")
+                        for a in airings:
+                            st.markdown(f"- **{a['channel']}** — {a['start']}–{a['stop']} (voir grille: {a['url']})")
+                    else:
+                        st.caption("📺 TNT : pas repéré sur les prochains jours (ou titre différent à l’antenne).")
+
+            if overview:
+                st.write(overview)
+
+            opts_all = ((sh.get("streamingOptions") or {}).get(country) or [])
+            opts_all = dedupe_streaming_options(opts_all)
+
+            opts_mine = [o for o in opts_all if ((o.get("service") or {}).get("id") in allowed_services)]
+            opts_mine = dedupe_streaming_options(opts_mine)
 
             if opts_mine:
-                st.markdown("<div class='ff-meta'>✅ Dispo sur tes applis</div>", unsafe_allow_html=True)
+                st.write("✅ Dispo sur tes applis :")
+                for o in opts_mine:
+                    s = (o.get("service") or {})
+                    name = s.get("name", s.get("id", "service"))
+                    typ = o.get("type", "")
+                    link = o.get("link") or o.get("videoLink")
+                    if link:
+                        st.markdown(f"- **{name}** ({typ}) → {link}")
+                    else:
+                        st.markdown(f"- **{name}** ({typ})")
             else:
-                st.markdown("<div class='ff-meta'>❌ Pas dispo sur tes applis</div>", unsafe_allow_html=True)
+                st.info("❌ Pas dispo sur tes applis.")
+                if show_elsewhere and opts_all:
+                    st.write("Dispo ailleurs :")
+                    for o in opts_all:
+                        s = (o.get("service") or {})
+                        name = s.get("name", s.get("id", "service"))
+                        typ = o.get("type", "")
+                        link = o.get("link") or o.get("videoLink")
+                        if link:
+                            st.markdown(f"- **{name}** ({typ}) → {link}")
+                        else:
+                            st.markdown(f"- **{name}** ({typ})")
 
-            if opts_mine:
-                st.markdown("<div class='ff-links'>", unsafe_allow_html=True)
-                for o in opts_mine[:3]:
-                    s = (o.get("service") or {})
-                    name = s.get("name", s.get("id", "service"))
-                    typ = o.get("type", "")
-                    link = o.get("link") or o.get("videoLink")
-                    if link:
-                        st.markdown(f"- **{name}** ({typ}) → {link}")
-                st.markdown("</div>", unsafe_allow_html=True)
-            elif show_elsewhere and opts_all:
-                st.markdown("<div class='ff-links'>", unsafe_allow_html=True)
-                for o in opts_all[:3]:
-                    s = (o.get("service") or {})
-                    name = s.get("name", s.get("id", "service"))
-                    typ = o.get("type", "")
-                    link = o.get("link") or o.get("videoLink")
-                    if link:
-                        st.markdown(f"- **{name}** ({typ}) → {link}")
-                st.markdown("</div>", unsafe_allow_html=True)
-
-            with st.expander("Détails", expanded=False):
-                if airings:
-                    txt = "TNT : " + " · ".join([f"{a['channel']} {a['start']}-{a['stop']}" for a in airings])
-                    st.markdown(f"<div class='ff-muted'>{txt}</div>", unsafe_allow_html=True)
-
-                if sources:
-                    st.markdown(f"<div class='ff-muted'>{sources}</div>", unsafe_allow_html=True)
-
-                if overview:
-                    st.write(overview)
-
-                actors = actors_list_from_omdb(sh)
-                if actors:
-                    actor_links = []
-                    for a in actors[:8]:
-                        actor_links.append(f"<a href='?actor={quote(a)}' target='_self'>{html.escape(a)}</a>")
-                    st.markdown(
-                        "<div class='ff-inline-actors'><span class='ff-muted'>Acteurs :</span> "
-                        + ", ".join(actor_links)
-                        + "</div>",
-                        unsafe_allow_html=True,
-                    )
-
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.divider()
