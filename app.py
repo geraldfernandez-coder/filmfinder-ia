@@ -5,8 +5,10 @@ import json
 import html
 import base64
 import random
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import requests
 import streamlit as st
@@ -15,12 +17,27 @@ from dotenv import load_dotenv
 # ================== CONFIG ==================
 load_dotenv()
 
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "").strip()
-RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com").strip()
+def read_secret(name: str, default: str = "") -> str:
+    val = os.getenv(name, "").strip()
+    if val:
+        return val
+    try:
+        return str(st.secrets.get(name, default)).strip()
+    except Exception:
+        return default
+
+RAPIDAPI_KEY = read_secret("RAPIDAPI_KEY")
+RAPIDAPI_HOST = read_secret("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com")
 BASE_URL = "https://streaming-availability.p.rapidapi.com"
-OMDB_API_KEY = os.getenv("OMDB_API_KEY", "").strip()
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").strip()
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip()
+OMDB_API_KEY = read_secret("OMDB_API_KEY")
+OLLAMA_URL = read_secret("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_MODEL = read_secret("OLLAMA_MODEL", "llama3.2:3b")
+TMDB_API_KEY = read_secret("TMDB_API_KEY")
+TMDB_BEARER_TOKEN = read_secret("TMDB_BEARER_TOKEN")
+TMDB_BASE_URL = "https://api.themoviedb.org/3"
+TMDB_IMAGE_BASE = read_secret("TMDB_IMAGE_BASE", "https://image.tmdb.org/t/p/original").rstrip("/")
+WIKIDATA_SPARQL_URL = "https://query.wikidata.org/sparql"
+APP_TZ = ZoneInfo("Europe/Paris")
 
 APP_DIR = Path(__file__).parent
 PROFILE_PATH = APP_DIR / "profile.json"
@@ -134,6 +151,10 @@ st.session_state.setdefault("scroll_results", False)
 st.session_state.setdefault("api_preview_notice", "")
 st.session_state.setdefault("api_error_notice", "")
 st.session_state.setdefault("bg_image_name", "")
+st.session_state.setdefault("bg_source", "")
+st.session_state.setdefault("bg_event_label", "")
+st.session_state.setdefault("bg_movie_title", "")
+st.session_state.setdefault("bg_refresh_nonce", 0)
 
 # ================== PROFILE ==================
 def load_profile():
@@ -448,13 +469,233 @@ def demo_bg_data_uri():
     return f"data:image/svg+xml;base64,{data}"
 
 # ================== THEME APPLY ==================
-def apply_theme():
-    bg_path = pick_bg_image()
-    bg_uri = file_to_data_uri(bg_path) if bg_path else demo_bg_data_uri()
-    if bg_uri:
-        background_rule = f"background-image: linear-gradient(rgba(18,23,34,0.28), rgba(18,23,34,0.22)), url('{bg_uri}'); background-size: cover; background-position: center center;"
+def tmdb_has_auth() -> bool:
+    return bool(TMDB_API_KEY or TMDB_BEARER_TOKEN)
+
+def tmdb_get(path: str, params=None, timeout: int = 20):
+    if not tmdb_has_auth():
+        raise RuntimeError("TMDB_API_KEY ou TMDB_BEARER_TOKEN manquant")
+    params = dict(params or {})
+    headers = {"Accept": "application/json"}
+    if TMDB_BEARER_TOKEN:
+        headers["Authorization"] = f"Bearer {TMDB_BEARER_TOKEN}"
     else:
-        background_rule = "background: linear-gradient(rgba(18,23,34,0.28), rgba(18,23,34,0.22));"
+        params["api_key"] = TMDB_API_KEY
+    r = requests.get(f"{TMDB_BASE_URL}{path}", params=params, headers=headers, timeout=timeout)
+    if not r.ok:
+        raise RuntimeError(f"TMDB ERROR {r.status_code}: {r.text[:240]}")
+    return r.json()
+
+def tmdb_image_url(path_value: str) -> str:
+    if not path_value:
+        return ""
+    return f"{TMDB_IMAGE_BASE}/{str(path_value).lstrip('/')}"
+
+def _today_parts(day_key: str):
+    base = str(day_key)[:10]
+    dt = datetime.fromisoformat(base)
+    return dt.month, dt.day
+
+@st.cache_data(show_spinner=False, ttl=21600)
+def wikidata_today_cinema_events(day_key: str):
+    month, day = _today_parts(day_key)
+    query = f"""
+    SELECT ?person ?personLabel ?eventType ?year ?imdb WHERE {{
+      VALUES ?occupation {{ wd:Q33999 wd:Q2526255 wd:Q28389 wd:Q2405480 wd:Q10800557 }}
+      {{
+        ?person wdt:P31 wd:Q5 ;
+                wdt:P106/wdt:P279* ?occupation ;
+                wdt:P569 ?date .
+        FILTER(MONTH(?date) = {month} && DAY(?date) = {day})
+        BIND("birth" AS ?eventType)
+        BIND(YEAR(?date) AS ?year)
+      }}
+      UNION
+      {{
+        ?person wdt:P31 wd:Q5 ;
+                wdt:P106/wdt:P279* ?occupation ;
+                wdt:P570 ?date .
+        FILTER(MONTH(?date) = {month} && DAY(?date) = {day})
+        BIND("death" AS ?eventType)
+        BIND(YEAR(?date) AS ?year)
+      }}
+      OPTIONAL {{ ?person wdt:P345 ?imdb. }}
+      SERVICE wikibase:label {{ bd:serviceParam wikibase:language "fr,en". }}
+    }}
+    LIMIT 40
+    """
+    try:
+        r = requests.get(
+            WIKIDATA_SPARQL_URL,
+            params={"format": "json", "query": query},
+            headers={"Accept": "application/sparql-results+json", "User-Agent": "FilmFinderIA/1.0"},
+            timeout=25,
+        )
+        if not r.ok:
+            return []
+        data = r.json()
+    except Exception:
+        return []
+
+    out = []
+    for row in (((data or {}).get("results") or {}).get("bindings") or []):
+        label = (((row.get("personLabel") or {}).get("value")) or "").strip()
+        if not label:
+            continue
+        out.append({
+            "name": label,
+            "event_type": (((row.get("eventType") or {}).get("value")) or "birth").strip(),
+            "year": (((row.get("year") or {}).get("value")) or "").strip(),
+            "imdb": (((row.get("imdb") or {}).get("value")) or "").strip(),
+        })
+
+    uniq = []
+    seen = set()
+    for item in out:
+        key = (norm_text(item["name"]), item["event_type"], item["year"])
+        if key not in seen:
+            seen.add(key)
+            uniq.append(item)
+    return uniq
+
+@st.cache_data(show_spinner=False, ttl=21600)
+def tmdb_search_person(name: str, lang: str = "fr-FR"):
+    data = tmdb_get("/search/person", {"query": name, "language": lang, "include_adult": "false"})
+    results = (data or {}).get("results") or []
+    return results[0] if results else None
+
+@st.cache_data(show_spinner=False, ttl=21600)
+def tmdb_person_combined_credits(person_id: int, lang: str = "fr-FR"):
+    data = tmdb_get(f"/person/{person_id}/combined_credits", {"language": lang})
+    return data or {}
+
+def pick_credit_from_combined(data: dict):
+    pool = []
+    for group_name in ("cast", "crew"):
+        for item in (data.get(group_name) or []):
+            media_type = item.get("media_type") or "movie"
+            if media_type not in ("movie", "tv"):
+                continue
+            title = item.get("title") or item.get("name") or ""
+            if not title:
+                continue
+            backdrop = item.get("backdrop_path") or ""
+            poster = item.get("poster_path") or ""
+            popularity = float(item.get("popularity") or 0.0)
+            vote_count = int(item.get("vote_count") or 0)
+            vote_average = float(item.get("vote_average") or 0.0)
+            date_value = item.get("release_date") or item.get("first_air_date") or ""
+            year = 0
+            try:
+                year = int(str(date_value)[:4])
+            except Exception:
+                year = 0
+            score = popularity * 4.0 + vote_count * 0.04 + vote_average * 2.0
+            if media_type == "movie":
+                score += 35
+            if backdrop:
+                score += 25
+            elif poster:
+                score += 10
+            if year >= 1980:
+                score += min(10, (year - 1980) / 5.0)
+            item_copy = dict(item)
+            item_copy["_ff_pick_score"] = score
+            pool.append(item_copy)
+    if not pool:
+        return None
+    pool.sort(key=lambda x: (x.get("_ff_pick_score", 0), x.get("vote_count") or 0, x.get("popularity") or 0), reverse=True)
+    return pool[0]
+
+@st.cache_data(show_spinner=False, ttl=21600)
+def tmdb_trending_background(day_key: str, lang: str = "fr-FR"):
+    data = tmdb_get("/trending/movie/day", {"language": lang})
+    for item in (data or {}).get("results") or []:
+        img = tmdb_image_url(item.get("backdrop_path") or item.get("poster_path") or "")
+        if not img:
+            continue
+        title = item.get("title") or item.get("original_title") or "Film du moment"
+        return {
+            "image_url": img,
+            "movie_title": title,
+            "event_label": "Film populaire du moment",
+            "source": "tmdb_trending",
+        }
+    return {}
+
+@st.cache_data(show_spinner=False, ttl=21600)
+def tmdb_daily_cinema_background(day_key: str, lang: str = "fr-FR"):
+    events = wikidata_today_cinema_events(day_key)
+    if events:
+        seed = int(day_key.replace("-", ""))
+        rng = random.Random(seed)
+        ordered = list(events)
+        rng.shuffle(ordered)
+        for event in ordered[:10]:
+            try:
+                person = tmdb_search_person(event["name"], lang=lang)
+                if not person:
+                    continue
+                credits = tmdb_person_combined_credits(int(person.get("id")), lang=lang)
+                picked = pick_credit_from_combined(credits)
+                if not picked:
+                    continue
+                img = tmdb_image_url(picked.get("backdrop_path") or picked.get("poster_path") or "")
+                if not img:
+                    continue
+                event_word = "Anniversaire" if event.get("event_type") == "birth" else "Hommage"
+                person_name = event["name"]
+                year = event.get("year") or ""
+                year_txt = f" ({year})" if year else ""
+                movie_title = picked.get("title") or picked.get("name") or ""
+                return {
+                    "image_url": img,
+                    "movie_title": movie_title,
+                    "event_label": f"{event_word} {person_name}{year_txt}",
+                    "source": "wikidata_tmdb",
+                }
+            except Exception:
+                continue
+    try:
+        return tmdb_trending_background(day_key, lang=lang)
+    except Exception:
+        return {}
+
+def pick_dynamic_background():
+    lang_code = "fr-FR"
+    try:
+        lang_code = "fr-FR" if profile.get("lang", "fr") == "fr" else "en-US"
+    except Exception:
+        pass
+
+    day_key = datetime.now(APP_TZ).strftime("%Y-%m-%d") + f"-{int(st.session_state.get('bg_refresh_nonce', 0))}"
+    if tmdb_has_auth():
+        info = tmdb_daily_cinema_background(day_key, lang=lang_code)
+        if info and info.get("image_url"):
+            st.session_state["bg_source"] = "TMDb + Wikidata" if info.get("source") == "wikidata_tmdb" else "TMDb"
+            st.session_state["bg_event_label"] = info.get("event_label", "")
+            st.session_state["bg_movie_title"] = info.get("movie_title", "")
+            st.session_state["bg_image_name"] = info.get("movie_title", "")
+            return info.get("image_url")
+
+    bg_path = pick_bg_image()
+    if bg_path:
+        st.session_state["bg_source"] = "Dossier bg"
+        st.session_state["bg_event_label"] = ""
+        st.session_state["bg_movie_title"] = ""
+        return file_to_data_uri(bg_path)
+
+    st.session_state["bg_source"] = "Démo"
+    st.session_state["bg_event_label"] = ""
+    st.session_state["bg_movie_title"] = ""
+    return demo_bg_data_uri()
+
+def apply_theme():
+    bg_uri = pick_dynamic_background()
+    if bg_uri:
+        background_rule = f"background-image: linear-gradient(rgba(18,23,34,0.34), rgba(18,23,34,0.28)), url('{bg_uri}'); background-size: cover; background-position: center center;"
+    else:
+        background_rule = "background: linear-gradient(rgba(18,23,34,0.34), rgba(18,23,34,0.28));"
 
     css = f"""
     <style>
@@ -1083,16 +1324,31 @@ with st.sidebar:
         st.radio("Menu", ["Recherche", "Profil"], key="page")
     else:
         st.caption("Accueil")
-    if st.session_state.get("bg_image_name"):
-        st.caption(f"Fond : {st.session_state['bg_image_name']}")
-        if st.button("Changer le fond"):
-            st.session_state["bg_image_name"] = ""
-            st.rerun()
+
+    bg_source = st.session_state.get("bg_source", "")
+    bg_movie = st.session_state.get("bg_movie_title", "")
+    bg_event = st.session_state.get("bg_event_label", "")
+    if bg_source:
+        st.caption(f"Fond : {bg_source}")
+    if bg_event:
+        st.caption(bg_event)
+    if bg_movie:
+        st.caption(f"Référence : {bg_movie}")
+    if (not tmdb_has_auth()) and st.session_state.get("bg_count", 0) == 0:
+        st.caption("Ajoute TMDB_API_KEY ou TMDB_BEARER_TOKEN dans les secrets Streamlit pour un fond cinéma du jour.")
+    if st.button("Changer le fond"):
+        st.session_state["bg_image_name"] = ""
+        st.session_state["bg_refresh_nonce"] = int(st.session_state.get("bg_refresh_nonce", 0)) + 1
+        st.rerun()
+    if tmdb_has_auth():
+        st.caption("This product uses the TMDb API but is not endorsed or certified by TMDb.")
 
 # ================== HOME ==================
 if st.session_state["page"] == "Accueil":
     st.markdown("<div class='ff-title-pill'><h1 class='ff-title'>FilmFinder IA</h1></div>", unsafe_allow_html=True)
     st.markdown("<div class='ff-subtitle'>Souvenir flou → titres probables → où regarder.</div>", unsafe_allow_html=True)
+    if tmdb_has_auth():
+        st.caption("Fond du jour : référence cinéma récupérée automatiquement via TMDb/Wikidata.")
 
     with st.form("signup_form"):
         c1, c2, c3, c4 = st.columns(4)
