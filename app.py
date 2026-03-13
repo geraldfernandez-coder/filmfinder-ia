@@ -354,7 +354,7 @@ def apply_theme():
     }}
     div[data-testid='stTextInput'],
     div[data-testid='stTextArea'] {{
-        max-width: 360px;
+        max-width: 320px;
     }}
     div[data-testid='stTextInput'] input,
     div[data-testid='stTextArea'] textarea {{
@@ -465,7 +465,7 @@ def apply_theme():
         }}
         div[data-testid='stTextInput'],
         div[data-testid='stTextArea'] {{
-            max-width: 300px !important;
+            max-width: 270px !important;
             min-width: 0 !important;
         }}
         .ff-clear-col button {{
@@ -923,7 +923,7 @@ if actor_name:
         clear_actor_mode()
 
 st.markdown("<div class='ff-pill'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
-col1, col2 = st.columns([9.0, 1.05], gap="small")
+col1, col2, _sp1 = st.columns([6.2, 0.85, 4.95], gap="small")
 with col1:
     st.text_input(
         "Ton souvenir (Entrée lance)",
@@ -942,7 +942,7 @@ if st.button("Trouver", type="primary"):
     run_search()
 
 st.markdown("<div class='ff-pill'>Détails (optionnel)</div>", unsafe_allow_html=True)
-col3, col4 = st.columns([9.0, 1.05], gap="small")
+col3, col4, _sp2 = st.columns([6.2, 0.85, 4.95], gap="small")
 with col3:
     st.text_area(
         "Détails (optionnel)",
