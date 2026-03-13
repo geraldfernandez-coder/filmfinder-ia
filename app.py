@@ -11,13 +11,19 @@ from dotenv import load_dotenv
 # ================== CONFIG ==================
 load_dotenv()
 
+# Streaming Availability (RapidAPI)
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "").strip()
 RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com").strip()
 BASE_URL = "https://streaming-availability.p.rapidapi.com"
 
-# IA locale (Ollama) - activée d'office si dispo
+# IA locale (Ollama) - ON si dispo
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").strip()
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip()
+
+# Notes “sites critiques” (optionnel)
+# -> si tu veux Rotten Tomatoes / Metacritic / IMDb: mets une clé OMDb dans .env :
+# OMDB_API_KEY=xxxxxxxx
+OMDB_API_KEY = os.getenv("OMDB_API_KEY", "").strip()
 
 APP_DIR = Path(__file__).parent
 PROFILE_PATH = APP_DIR / "profile.json"
@@ -31,7 +37,7 @@ def apply_theme():
     html, body, .stApp, [data-testid="stAppViewContainer"] { background: #f4f6f8 !important; }
 
     .main .block-container{
-        max-width: 980px !important;
+        max-width: 1020px !important;
         margin: 18px auto !important;
         background: #ffffff !important;
         border-radius: 18px !important;
@@ -55,51 +61,21 @@ def apply_theme():
         box-shadow: 0 8px 24px rgba(0,0,0,0.06);
         margin: 12px 0 18px 0;
     }
+    .ff-muted{ color: rgba(0,0,0,0.65) !important; }
+    .ff-badge{
+        display:inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(0,0,0,0.06);
+        font-size: 13px;
+        margin-right: 8px;
+        margin-bottom: 6px;
+    }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
 apply_theme()
-
-# ================== OLLAMA (IA locale) ==================
-def ollama_is_up() -> bool:
-    try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=2)
-        return r.ok
-    except Exception:
-        return False
-
-def ollama_pack(description: str):
-    """
-    Retour attendu JSON:
-    {"titles":[...], "queries":[...]}
-    """
-    prompt = f"""
-Tu aides à retrouver un film/série depuis un souvenir flou.
-Retourne UNIQUEMENT un JSON valide avec:
-- "titles": 5 à 10 titres probables (FR + original si possible)
-- "queries": 6 à 12 requêtes (FR/EN) pour chercher dans une base de films
-
-Souvenir: {description}
-""".strip()
-
-    r = requests.post(
-        f"{OLLAMA_URL}/api/generate",
-        json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
-        timeout=60,
-    )
-    if not r.ok:
-        raise RuntimeError(f"Ollama ERROR {r.status_code}: {r.text[:300]}")
-
-    txt = r.json().get("response", "")
-    start = txt.find("{")
-    end = txt.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        return {"titles": [], "queries": []}
-    try:
-        return json.loads(txt[start:end + 1])
-    except Exception:
-        return {"titles": [], "queries": []}
 
 # ================== PROFILE ==================
 def load_profile():
@@ -115,8 +91,6 @@ def load_profile():
         "show_type": "all",
         "platform_ids": [],
         "show_elsewhere": False,
-        # on le garde en profil, mais on va forcer ON si Ollama est dispo
-        "use_local_ai": True,
     }
 
 def save_profile(p):
@@ -124,11 +98,56 @@ def save_profile(p):
 
 profile = load_profile()
 
-# FORCER IA LOCALE D'OFFICE si Ollama tourne
-if ollama_is_up():
-    if profile.get("use_local_ai") is not True:
-        profile["use_local_ai"] = True
-        save_profile(profile)
+# ================== OLLAMA ==================
+def ollama_is_up() -> bool:
+    try:
+        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=2)
+        return r.ok
+    except Exception:
+        return False
+
+def ollama_pack(description: str):
+    """
+    JSON STRICT + court => rapide
+    {"titles":[...], "queries":[...]}
+    """
+    prompt = f"""
+Réponds UNIQUEMENT avec un JSON valide:
+{{"titles":[...], "queries":[...]}}
+
+Règles:
+- titles: 3 à 6 titres max (courts)
+- queries: 4 à 6 requêtes max (3 à 7 mots), FR/EN
+- PAS de phrases longues
+
+Souvenir: {description}
+""".strip()
+
+    r = requests.post(
+        f"{OLLAMA_URL}/api/generate",
+        json={
+            "model": OLLAMA_MODEL,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"temperature": 0.2, "num_predict": 220}
+        },
+        timeout=60,
+    )
+    if not r.ok:
+        raise RuntimeError(f"Ollama ERROR {r.status_code}: {r.text[:300]}")
+
+    txt = (r.json().get("response", "") or "").strip()
+    try:
+        return json.loads(txt)
+    except Exception:
+        start = txt.find("{")
+        end = txt.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return {"titles": [], "queries": []}
+        try:
+            return json.loads(txt[start:end + 1])
+        except Exception:
+            return {"titles": [], "queries": []}
 
 # ================== RAPIDAPI ==================
 def sa_get(path: str, params: dict):
@@ -184,8 +203,96 @@ def get_poster_url(show: dict):
     except Exception:
         return None
 
+# ================== OMDb (notes critiques) ==================
+@st.cache_data(show_spinner=False, ttl=86400)
+def omdb_fetch(imdb_id: str):
+    if not OMDB_API_KEY or not imdb_id:
+        return None
+    try:
+        r = requests.get(
+            "https://www.omdbapi.com/",
+            params={"i": imdb_id, "apikey": OMDB_API_KEY, "tomatoes": "true"},
+            timeout=20,
+        )
+        if not r.ok:
+            return None
+        data = r.json()
+        if data.get("Response") == "True":
+            return data
+    except Exception:
+        return None
+    return None
+
+def parse_critic_scores(show: dict):
+    """
+    Retour:
+    (display_str, score_0_100 or None)
+    Priorité score: RT% > Metascore > IMDb*10 > rating API si présent
+    """
+    # 1) rating "API" (souvent /100) si dispo
+    api_rating = show.get("rating", None)
+    api_score = None
+    if isinstance(api_rating, (int, float)):
+        api_score = float(api_rating)
+
+    imdb_id = show.get("imdbId") or show.get("imdbID") or None
+    data = omdb_fetch(imdb_id) if imdb_id else None
+
+    rt = None
+    meta = None
+    imdb = None
+
+    if data:
+        # IMDb
+        try:
+            if data.get("imdbRating") and data.get("imdbRating") != "N/A":
+                imdb = float(data["imdbRating"])
+        except Exception:
+            pass
+        # Metascore
+        try:
+            if data.get("Metascore") and data.get("Metascore") != "N/A":
+                meta = int(data["Metascore"])
+        except Exception:
+            pass
+        # Rotten Tomatoes dans Ratings[]
+        try:
+            for r in data.get("Ratings", []) or []:
+                if r.get("Source") == "Rotten Tomatoes":
+                    v = r.get("Value", "")
+                    if v.endswith("%"):
+                        rt = int(v.replace("%", "").strip())
+        except Exception:
+            pass
+
+    parts = []
+    if rt is not None:
+        parts.append(f"🍅 {rt}%")
+    if meta is not None:
+        parts.append(f"📰 {meta}/100")
+    if imdb is not None:
+        parts.append(f"⭐ {imdb:.1f}/10")
+
+    # Score utilisé pour trier
+    if rt is not None:
+        score = float(rt)
+    elif meta is not None:
+        score = float(meta)
+    elif imdb is not None:
+        score = float(imdb * 10.0)
+    elif api_score is not None:
+        score = float(api_score)
+        parts.append(f"📊 {int(score)}/100")
+    else:
+        score = None
+        if api_score is not None:
+            parts.append(f"📊 {int(api_score)}/100")
+
+    display = " · ".join(parts) if parts else ""
+    return display, score
+
 # ================== SEARCH HELPERS ==================
-def score(sh, qtext):
+def score_relevance(sh, qtext):
     t = ((sh.get("title") or "") + " " + (sh.get("overview") or "")).lower()
     words = [w for w in re.findall(r"[a-zA-ZÀ-ÿ0-9']+", qtext.lower()) if len(w) >= 4]
     return sum(1 for w in set(words) if w in t)
@@ -261,16 +368,19 @@ def get_home_poster(country: str, lang: str):
             pass
     return None, None
 
-# ================== MENU ==================
+# ================== MENU / STATE ==================
 st.session_state.setdefault("entered", False)
 st.session_state.setdefault("page", "Accueil")
 st.session_state.setdefault("do_search", False)
+st.session_state.setdefault("last_results", None)  # liste de shows
+st.session_state.setdefault("last_query", "")
 
 with st.sidebar:
     ok, msg = api_healthcheck()
     st.markdown("## FilmFinder IA")
     st.caption("✅ " + msg if ok else "❌ " + msg)
     st.caption("🤖 IA locale : " + ("ON" if ollama_is_up() else "OFF"))
+    st.caption("📝 Notes critiques : " + ("ON (OMDb)" if OMDB_API_KEY else "OFF (optionnel)"))
 
     if st.session_state["entered"]:
         st.radio("Menu", ["Recherche", "Profil"], key="page")
@@ -296,6 +406,7 @@ if st.session_state["page"] == "Accueil":
 
     st.markdown('<div class="ff-card">', unsafe_allow_html=True)
     st.markdown("### Inscription rapide")
+    st.caption("Pas de nom/prénom. Juste ce qui sert à filtrer la recherche.")
 
     if not RAPIDAPI_KEY:
         st.error("RAPIDAPI_KEY manquante dans .env (RapidAPI).")
@@ -342,7 +453,6 @@ if st.session_state["page"] == "Accueil":
                 "show_type": show_type,
                 "platform_ids": platform_ids,
                 "show_elsewhere": show_elsewhere,
-                "use_local_ai": True,  # <= toujours ON
             }
             save_profile(profile)
             st.session_state["entered"] = True
@@ -354,7 +464,6 @@ if st.session_state["page"] == "Accueil":
 # ================== PROFIL ==================
 if st.session_state["page"] == "Profil":
     st.markdown("# Profil")
-    st.caption("IA locale est activée d’office si Ollama est dispo (tu n’as rien à cocher).")
 
     with st.form("profile_form"):
         pseudo = st.text_input("Pseudo (optionnel)", value=profile.get("pseudo", ""))
@@ -390,7 +499,6 @@ if st.session_state["page"] == "Profil":
                 "show_type": show_type,
                 "platform_ids": platform_ids,
                 "show_elsewhere": show_elsewhere,
-                "use_local_ai": True,  # <= toujours ON
             }
             save_profile(profile)
             st.success("Profil enregistré.")
@@ -417,6 +525,7 @@ with st.expander("Ajouter des détails (optionnel)"):
 if st.button("Trouver"):
     st.session_state["do_search"] = True
 
+# --- lance une nouvelle recherche ---
 if st.session_state["do_search"]:
     st.session_state["do_search"] = False
     q = (q_main.strip() + " " + q_more.strip()).strip()
@@ -428,14 +537,12 @@ if st.session_state["do_search"]:
     country = profile["country"]
     lang = profile["lang"]
     show_type = profile["show_type"]
-    allowed_services = set(profile["platform_ids"])
-    show_elsewhere = bool(profile.get("show_elsewhere", False))
 
     titles = []
     queries = []
     errors = []
 
-    # IA locale d’office si dispo
+    # IA locale -> pack de requêtes (rapide)
     if ollama_is_up():
         try:
             pack = ollama_pack(q)
@@ -448,40 +555,102 @@ if st.session_state["do_search"]:
     if not queries:
         queries = [extract_keywords(q), q]
 
-    st.caption("Requêtes : " + " | ".join(queries[:4]))
+    # MODE RAPIDE: peu d'appels
+    TITLES_MAX = 4
+    QUERIES_MAX = 4
 
     found = []
 
-    for t in titles[:10]:
+    # 1) Titres
+    for t in titles[:TITLES_MAX]:
         try:
             found += search_by_title(t, country, show_type, lang)
         except Exception as e:
             errors.append(str(e))
 
-    for kw in queries[:8]:
+    # 2) Keywords FR
+    for kw in queries[:QUERIES_MAX]:
         try:
             found += search_by_keyword(kw, country, show_type, lang)
         except Exception as e:
             errors.append(str(e))
-        try:
-            found += search_by_keyword(kw, country, show_type, "en")
-        except Exception as e:
-            errors.append(str(e))
+
+    # 3) Keywords EN seulement si on a trop peu de résultats
+    if len(found) < 8:
+        for kw in queries[:QUERIES_MAX]:
+            try:
+                found += search_by_keyword(kw, country, show_type, "en")
+            except Exception as e:
+                errors.append(str(e))
 
     found = merge_results(found)
-    found.sort(key=lambda sh: score(sh, q), reverse=True)
+    found.sort(key=lambda sh: score_relevance(sh, q), reverse=True)
+
+    # on garde un “pool” raisonnable pour tri/notes (évite 280 résultats et le PC qui rame)
+    found = found[:60]
+
+    st.session_state["last_results"] = found
+    st.session_state["last_query"] = q
+    st.session_state["last_errors"] = errors
+
+# --- affichage (tri) ---
+results = st.session_state.get("last_results")
+if results is not None:
+    q = st.session_state.get("last_query", "")
+    errors = st.session_state.get("last_errors", [])
 
     if errors:
-        st.warning("⚠️ Debug (utile si 0 résultat) :\n- " + "\n- ".join(errors[:2]))
+        st.warning("⚠️ Debug (utile si ça bug) :\n- " + "\n- ".join(errors[:2]))
 
-    st.write(f"✅ Résultats : {len(found)} (20 max affichés)")
+    st.caption(f"Requête: {q}")
 
-    for sh in found[:20]:
+    sort_mode = st.selectbox(
+        "Trier par",
+        ["Pertinence", "Année (récent)", "Note (haute)"],
+        index=0
+    )
+
+    # Pré-calcul des notes pour tri (limité pour éviter lenteur OMDb)
+    enriched = []
+    for i, sh in enumerate(results):
+        year = sh.get("releaseYear") or sh.get("firstAirYear") or 0
+        try:
+            year = int(year) if year else 0
+        except Exception:
+            year = 0
+
+        # Notes: OMDb peut être lent -> on calcule pour les 25 premiers seulement
+        note_str = ""
+        note_score = None
+        if i < 25:
+            note_str, note_score = parse_critic_scores(sh)
+        else:
+            # fallback “API rating” si dispo
+            if isinstance(sh.get("rating"), (int, float)):
+                note_score = float(sh["rating"])
+                note_str = f"📊 {int(note_score)}/100"
+
+        enriched.append((sh, year, note_score, note_str))
+
+    if sort_mode == "Année (récent)":
+        enriched.sort(key=lambda x: x[1], reverse=True)
+    elif sort_mode == "Note (haute)":
+        enriched.sort(key=lambda x: (x[2] is not None, x[2] or -1), reverse=True)
+    else:
+        # Pertinence = on garde l'ordre déjà trié
+        pass
+
+    st.write(f"✅ Résultats : {len(enriched)} (affichage des 20 premiers)")
+
+    country = profile["country"]
+    allowed_services = set(profile.get("platform_ids", []))
+    show_elsewhere = bool(profile.get("show_elsewhere", False))
+
+    for sh, year, note_score, note_str in enriched[:20]:
         title = sh.get("title", "Sans titre")
-        year = sh.get("releaseYear") or sh.get("firstAirYear") or ""
         overview = sh.get("overview", "")
-
         poster = get_poster_url(sh)
+
         c_img, c_txt = st.columns([1, 3])
 
         with c_img:
@@ -491,7 +660,11 @@ if st.session_state["do_search"]:
                 st.markdown("🎞️")
 
         with c_txt:
-            st.markdown(f"### {title} ({year})")
+            line = f"### {title} ({year if year else ''})"
+            if note_str:
+                line += f" — {note_str}"
+            st.markdown(line)
+
             if overview:
                 st.write(overview)
 
