@@ -252,9 +252,16 @@ def apply_theme():
     }}
 
     
-    .ff-shell-title h1 { margin: 0; }
-    .ff-shell-title p { margin: 4px 0 0 0; }
-    .ff-result-title { font-size: 1.9rem; font-weight: 800; }
+    .ff-bubble, .ff-result-bubble, .ff-shell-title {
+        border-radius: 30px;
+        box-shadow: 0 14px 34px rgba(0,0,0,0.08);
+    }
+    .ff-result-bubble {
+        padding: 16px 18px 14px 18px;
+    }
+    .stButton > button {
+        border-radius: 999px !important;
+    }
     
 
     @media (max-width: 768px) {{
