@@ -2,7 +2,12 @@ import os
 import re
 import json
 import random
+import gzip
+import io
+import difflib
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 import requests
 import streamlit as st
@@ -16,14 +21,16 @@ RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "").strip()
 RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com").strip()
 BASE_URL = "https://streaming-availability.p.rapidapi.com"
 
-# IA locale (Ollama) - ON si dispo
+# IA locale (Ollama)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").strip()
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip()
 
-# Notes “sites critiques” (optionnel)
-# -> si tu veux Rotten Tomatoes / Metacritic / IMDb: mets une clé OMDb dans .env :
-# OMDB_API_KEY=xxxxxxxx
+# Notes critiques (optionnel)
 OMDB_API_KEY = os.getenv("OMDB_API_KEY", "").strip()
+
+# TNT (XMLTVFr) - optionnel
+XMLTV_TNT_URL = os.getenv("XMLTV_TNT_URL", "").strip()
+TNT_LOOKAHEAD_DAYS = int(os.getenv("TNT_LOOKAHEAD_DAYS", "5"))
 
 APP_DIR = Path(__file__).parent
 PROFILE_PATH = APP_DIR / "profile.json"
@@ -37,7 +44,7 @@ def apply_theme():
     html, body, .stApp, [data-testid="stAppViewContainer"] { background: #f4f6f8 !important; }
 
     .main .block-container{
-        max-width: 1020px !important;
+        max-width: 1040px !important;
         margin: 18px auto !important;
         background: #ffffff !important;
         border-radius: 18px !important;
@@ -62,20 +69,44 @@ def apply_theme():
         margin: 12px 0 18px 0;
     }
     .ff-muted{ color: rgba(0,0,0,0.65) !important; }
-    .ff-badge{
-        display:inline-block;
-        padding: 4px 10px;
-        border-radius: 999px;
-        background: rgba(0,0,0,0.06);
-        font-size: 13px;
-        margin-right: 8px;
-        margin-bottom: 6px;
-    }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
 apply_theme()
+
+# ================== UTILS ==================
+def norm_text(s: str) -> str:
+    if not s:
+        return ""
+    s = s.lower().strip()
+    s = re.sub(r"[’']", "'", s)
+    s = re.sub(r"[^a-z0-9àâçéèêëîïôùûüÿñæœ'\s-]", " ", s, flags=re.I)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+def stars_html(score_0_100):
+    """5 étoiles avec remplissage proportionnel (jaune), score en 0..100."""
+    if score_0_100 is None:
+        return ""
+    try:
+        s = float(score_0_100)
+    except Exception:
+        return ""
+    s = max(0.0, min(100.0, s))
+    # gradient sur 5 étoiles "★★★★★"
+    pct = s
+    return f"""
+    <span style="
+        font-size:16px;
+        font-weight:700;
+        background: linear-gradient(90deg, #f5c518 {pct}%, #d0d0d0 {pct}%);
+        -webkit-background-clip: text;
+        color: transparent;
+        letter-spacing: 1px;
+        white-space: nowrap;
+    ">★★★★★</span>
+    """
 
 # ================== PROFILE ==================
 def load_profile():
@@ -223,17 +254,14 @@ def omdb_fetch(imdb_id: str):
         return None
     return None
 
-def parse_critic_scores(show: dict):
+def critic_score_and_sources(show: dict):
     """
     Retour:
-    (display_str, score_0_100 or None)
-    Priorité score: RT% > Metascore > IMDb*10 > rating API si présent
+      score_0_100 (float or None),
+      sources_str (ex: "IMDb 8.2/10 · Meta 74/100 · RT 93%")
     """
-    # 1) rating "API" (souvent /100) si dispo
     api_rating = show.get("rating", None)
-    api_score = None
-    if isinstance(api_rating, (int, float)):
-        api_score = float(api_rating)
+    api_score = float(api_rating) if isinstance(api_rating, (int, float)) else None
 
     imdb_id = show.get("imdbId") or show.get("imdbID") or None
     data = omdb_fetch(imdb_id) if imdb_id else None
@@ -243,19 +271,16 @@ def parse_critic_scores(show: dict):
     imdb = None
 
     if data:
-        # IMDb
         try:
             if data.get("imdbRating") and data.get("imdbRating") != "N/A":
                 imdb = float(data["imdbRating"])
         except Exception:
             pass
-        # Metascore
         try:
             if data.get("Metascore") and data.get("Metascore") != "N/A":
                 meta = int(data["Metascore"])
         except Exception:
             pass
-        # Rotten Tomatoes dans Ratings[]
         try:
             for r in data.get("Ratings", []) or []:
                 if r.get("Source") == "Rotten Tomatoes":
@@ -266,14 +291,16 @@ def parse_critic_scores(show: dict):
             pass
 
     parts = []
-    if rt is not None:
-        parts.append(f"🍅 {rt}%")
-    if meta is not None:
-        parts.append(f"📰 {meta}/100")
     if imdb is not None:
-        parts.append(f"⭐ {imdb:.1f}/10")
+        parts.append(f"IMDb {imdb:.1f}/10")
+    if meta is not None:
+        parts.append(f"Meta {meta}/100")
+    if rt is not None:
+        parts.append(f"RT {rt}%")
+    if not parts and api_score is not None:
+        parts.append(f"Score {int(api_score)}/100")
 
-    # Score utilisé pour trier
+    # score pour étoiles/tri : priorité RT > Meta > IMDb > API
     if rt is not None:
         score = float(rt)
     elif meta is not None:
@@ -282,16 +309,152 @@ def parse_critic_scores(show: dict):
         score = float(imdb * 10.0)
     elif api_score is not None:
         score = float(api_score)
-        parts.append(f"📊 {int(score)}/100")
     else:
         score = None
-        if api_score is not None:
-            parts.append(f"📊 {int(api_score)}/100")
 
-    display = " · ".join(parts) if parts else ""
-    return display, score
+    return score, (" · ".join(parts) if parts else "")
 
-# ================== SEARCH HELPERS ==================
+# ================== TNT (XMLTVFr) ==================
+def _candidate_xmltv_urls():
+    urls = []
+    if XMLTV_TNT_URL:
+        urls.append(XMLTV_TNT_URL)
+    urls += [
+        "https://xmltvfr.fr/xmltv/xmltv_tnt.xml.gz",
+        "https://xmltvfr.fr/xmltv/xmltv_tnt.xml",
+    ]
+    return urls
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def tnt_load_index():
+    headers = {"User-Agent": "Mozilla/5.0 FilmFinderIA/1.0"}
+    last_err = None
+
+    content = None
+    used_url = None
+    for url in _candidate_xmltv_urls():
+        try:
+            r = requests.get(url, headers=headers, timeout=30)
+            if r.ok and r.content:
+                content = r.content
+                used_url = url
+                break
+            last_err = f"{url} -> {r.status_code}"
+        except Exception as e:
+            last_err = f"{url} -> {e}"
+
+    if content is None:
+        raise RuntimeError(f"Impossible de récupérer le guide TNT. Dernière erreur: {last_err}")
+
+    if used_url.endswith(".gz") or (len(content) > 2 and content[0] == 0x1F and content[1] == 0x8B):
+        content = gzip.decompress(content)
+
+    channel_names = {}
+    title_index = {}
+
+    now = datetime.now(timezone.utc)
+    end = now + timedelta(days=max(1, TNT_LOOKAHEAD_DAYS))
+
+    for event, elem in ET.iterparse(io.BytesIO(content), events=("end",)):
+        if elem.tag == "channel":
+            cid = elem.attrib.get("id", "")
+            name = None
+            for dn in elem.findall("display-name"):
+                if dn.text:
+                    name = dn.text.strip()
+                    break
+            if cid and name:
+                channel_names[cid] = name
+            elem.clear()
+
+        elif elem.tag == "programme":
+            ch = elem.attrib.get("channel", "")
+            start_s = elem.attrib.get("start", "")
+            stop_s = elem.attrib.get("stop", "")
+
+            def parse_dt(s):
+                try:
+                    return datetime.strptime(s, "%Y%m%d%H%M%S %z")
+                except Exception:
+                    return None
+
+            start_dt = parse_dt(start_s)
+            stop_dt = parse_dt(stop_s)
+            if not start_dt or not stop_dt:
+                elem.clear()
+                continue
+
+            start_utc = start_dt.astimezone(timezone.utc)
+            if start_utc < now or start_utc > end:
+                elem.clear()
+                continue
+
+            title = None
+            for t in elem.findall("title"):
+                if t.text:
+                    title = t.text.strip()
+                    break
+            if not title:
+                elem.clear()
+                continue
+
+            key = norm_text(title)
+            if key:
+                title_index.setdefault(key, []).append((start_dt.isoformat(), stop_dt.isoformat(), ch))
+            elem.clear()
+
+    for k in list(title_index.keys()):
+        title_index[k].sort(key=lambda x: x[0])
+        title_index[k] = title_index[k][:10]
+
+    return channel_names, title_index
+
+def tnt_find_airings(title_variants, limit=2):
+    try:
+        channel_names, idx = tnt_load_index()
+    except Exception:
+        return []
+
+    keys = [norm_text(t) for t in title_variants if t]
+    keys = [k for k in keys if k]
+
+    matches = []
+    for k in keys:
+        if k in idx:
+            matches += idx[k]
+
+    if not matches and idx and keys:
+        all_keys = list(idx.keys())
+        for k in keys:
+            close = difflib.get_close_matches(k, all_keys, n=2, cutoff=0.92)
+            for ck in close:
+                matches += idx.get(ck, [])
+
+    uniq = []
+    seen = set()
+    for s, e, ch in matches:
+        key = (s, ch)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((s, e, ch))
+    uniq.sort(key=lambda x: x[0])
+
+    out = []
+    for s, e, ch in uniq[:limit]:
+        try:
+            sdt = datetime.fromisoformat(s)
+            edt = datetime.fromisoformat(e)
+            out.append({
+                "channel": channel_names.get(ch, ch),
+                "start": sdt.strftime("%d/%m %H:%M"),
+                "stop": edt.strftime("%H:%M"),
+            })
+        except Exception:
+            continue
+    return out
+
+# ================== SEARCH ==================
 def score_relevance(sh, qtext):
     t = ((sh.get("title") or "") + " " + (sh.get("overview") or "")).lower()
     words = [w for w in re.findall(r"[a-zA-ZÀ-ÿ0-9']+", qtext.lower()) if len(w) >= 4]
@@ -305,30 +468,24 @@ def merge_results(items):
 
 def search_by_title(title: str, country: str, show_type: str, lang: str):
     type_param = None if show_type == "all" else show_type
-    data = sa_get(
-        "/shows/search/title",
-        {
-            "title": title,
-            "country": country,
-            "show_type": type_param,
-            "series_granularity": "show",
-            "output_language": lang,
-        },
-    )
+    data = sa_get("/shows/search/title", {
+        "title": title,
+        "country": country,
+        "show_type": type_param,
+        "series_granularity": "show",
+        "output_language": lang,
+    })
     return data if isinstance(data, list) else []
 
 def search_by_keyword(keyword: str, country: str, show_type: str, lang: str):
     type_param = None if show_type == "all" else show_type
-    res = sa_get(
-        "/shows/search/filters",
-        {
-            "country": country,
-            "show_type": type_param,
-            "keyword": keyword,
-            "series_granularity": "show",
-            "output_language": lang,
-        },
-    )
+    res = sa_get("/shows/search/filters", {
+        "country": country,
+        "show_type": type_param,
+        "keyword": keyword,
+        "series_granularity": "show",
+        "output_language": lang,
+    })
     return res.get("shows", []) if isinstance(res, dict) else []
 
 def extract_keywords(text: str, max_words: int = 10) -> str:
@@ -348,40 +505,20 @@ def extract_keywords(text: str, max_words: int = 10) -> str:
             break
     return " ".join(out) if out else text.strip()
 
-# ================== ACCUEIL: affiche ==================
-@st.cache_data(show_spinner=False, ttl=3600)
-def get_home_poster(country: str, lang: str):
-    titles = [
-        "Inception", "The Matrix", "Interstellar", "Titanic", "Gladiator",
-        "Avatar", "The Godfather", "Pulp Fiction", "The Dark Knight",
-        "Forrest Gump", "Jurassic Park"
-    ]
-    random.shuffle(titles)
-    for t in titles:
-        try:
-            res = search_by_title(t, country=country, show_type="movie", lang=lang)
-            if res:
-                url = get_poster_url(res[0])
-                if url:
-                    return url, res[0].get("title", t)
-        except Exception:
-            pass
-    return None, None
-
-# ================== MENU / STATE ==================
+# ================== STATE / MENU ==================
 st.session_state.setdefault("entered", False)
 st.session_state.setdefault("page", "Accueil")
 st.session_state.setdefault("do_search", False)
-st.session_state.setdefault("last_results", None)  # liste de shows
+st.session_state.setdefault("last_results", None)
 st.session_state.setdefault("last_query", "")
+st.session_state.setdefault("last_errors", [])
 
 with st.sidebar:
     ok, msg = api_healthcheck()
     st.markdown("## FilmFinder IA")
     st.caption("✅ " + msg if ok else "❌ " + msg)
-    st.caption("🤖 IA locale : " + ("ON" if ollama_is_up() else "OFF"))
-    st.caption("📝 Notes critiques : " + ("ON (OMDb)" if OMDB_API_KEY else "OFF (optionnel)"))
-
+    st.caption("IA locale: " + ("ON" if ollama_is_up() else "OFF"))
+    st.caption("Notes critiques: " + ("ON" if OMDB_API_KEY else "OFF"))
     if st.session_state["entered"]:
         st.radio("Menu", ["Recherche", "Profil"], key="page")
     else:
@@ -392,22 +529,8 @@ if st.session_state["page"] == "Accueil":
     st.markdown("# FilmFinder IA")
     st.caption("Souvenir flou → titres probables → où regarder (liens).")
 
-    if RAPIDAPI_KEY:
-        poster_url, poster_title = get_home_poster(country=profile.get("country","fr"), lang=profile.get("lang","fr"))
-        if poster_url:
-            c1, c2 = st.columns([1, 2])
-            with c1:
-                st.image(poster_url, width=210)
-            with c2:
-                st.markdown("### 🍿 Bienvenue")
-                st.caption(f"Affiche aléatoire : **{poster_title}**")
-        else:
-            st.markdown("### 🍿 Bienvenue")
-
     st.markdown('<div class="ff-card">', unsafe_allow_html=True)
     st.markdown("### Inscription rapide")
-    st.caption("Pas de nom/prénom. Juste ce qui sert à filtrer la recherche.")
-
     if not RAPIDAPI_KEY:
         st.error("RAPIDAPI_KEY manquante dans .env (RapidAPI).")
         st.stop()
@@ -458,13 +581,11 @@ if st.session_state["page"] == "Accueil":
             st.session_state["entered"] = True
             st.session_state["page"] = "Recherche"
             st.rerun()
-
     st.stop()
 
 # ================== PROFIL ==================
 if st.session_state["page"] == "Profil":
     st.markdown("# Profil")
-
     with st.form("profile_form"):
         pseudo = st.text_input("Pseudo (optionnel)", value=profile.get("pseudo", ""))
 
@@ -503,33 +624,35 @@ if st.session_state["page"] == "Profil":
             save_profile(profile)
             st.success("Profil enregistré.")
             st.rerun()
-
     st.stop()
 
 # ================== RECHERCHE ==================
 st.markdown("# Recherche")
 
+if not profile.get("platform_ids"):
+    st.warning("Crée ton profil (plateformes) avant de chercher.")
+    st.stop()
+
+MODE_PRESETS = {
+    "Rapide":  {"titles_max": 2, "queries_max": 2, "en_if_under": 6,  "pool": 40,  "omdb_top": 10},
+    "Normal":  {"titles_max": 4, "queries_max": 4, "en_if_under": 8,  "pool": 60,  "omdb_top": 18},
+    "Profond": {"titles_max": 6, "queries_max": 6, "en_if_under": 999, "pool": 100, "omdb_top": 25},
+}
+
+mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True)
+preset = MODE_PRESETS[mode]
+
 def trigger_search():
     st.session_state["do_search"] = True
 
-q_main = st.text_input(
-    "Ton souvenir (Entrée lance la recherche)",
-    key="q_main",
-    on_change=trigger_search,
-    placeholder="Ex: un homme se perd dans la forêt…"
-)
-
-with st.expander("Ajouter des détails (optionnel)"):
-    q_more = st.text_area("Détails", key="q_more", height=90)
-
+q_main = st.text_input("Ton souvenir (Entrée lance)", key="q_main", on_change=trigger_search)
+q_more = st.text_area("Détails (optionnel)", key="q_more", height=80)
 if st.button("Trouver"):
     st.session_state["do_search"] = True
 
-# --- lance une nouvelle recherche ---
 if st.session_state["do_search"]:
     st.session_state["do_search"] = False
     q = (q_main.strip() + " " + q_more.strip()).strip()
-
     if not q:
         st.warning("Écris au moins une phrase 🙂")
         st.stop()
@@ -542,7 +665,6 @@ if st.session_state["do_search"]:
     queries = []
     errors = []
 
-    # IA locale -> pack de requêtes (rapide)
     if ollama_is_up():
         try:
             pack = ollama_pack(q)
@@ -551,33 +673,44 @@ if st.session_state["do_search"]:
         except Exception as e:
             errors.append(f"IA locale: {e}")
 
-    # fallback sans IA
     if not queries:
         queries = [extract_keywords(q), q]
 
-    # MODE RAPIDE: peu d'appels
-    TITLES_MAX = 4
-    QUERIES_MAX = 4
+    # Profond: on ajoute une requête de secours
+    if mode == "Profond":
+        qk = extract_keywords(q, max_words=14)
+        if qk not in queries:
+            queries.append(qk)
+        if q not in queries:
+            queries.append(q)
+
+    # dédoublonnage
+    q_seen = []
+    for x in queries:
+        x = x.strip()
+        if x and x not in q_seen:
+            q_seen.append(x)
+    queries = q_seen
 
     found = []
 
-    # 1) Titres
-    for t in titles[:TITLES_MAX]:
+    # 1) titres
+    for t in titles[:preset["titles_max"]]:
         try:
             found += search_by_title(t, country, show_type, lang)
         except Exception as e:
             errors.append(str(e))
 
-    # 2) Keywords FR
-    for kw in queries[:QUERIES_MAX]:
+    # 2) keywords FR
+    for kw in queries[:preset["queries_max"]]:
         try:
             found += search_by_keyword(kw, country, show_type, lang)
         except Exception as e:
             errors.append(str(e))
 
-    # 3) Keywords EN seulement si on a trop peu de résultats
-    if len(found) < 8:
-        for kw in queries[:QUERIES_MAX]:
+    # 3) keywords EN si trop peu de résultats
+    if len(found) < preset["en_if_under"]:
+        for kw in queries[:preset["queries_max"]]:
             try:
                 found += search_by_keyword(kw, country, show_type, "en")
             except Exception as e:
@@ -585,32 +718,28 @@ if st.session_state["do_search"]:
 
     found = merge_results(found)
     found.sort(key=lambda sh: score_relevance(sh, q), reverse=True)
-
-    # on garde un “pool” raisonnable pour tri/notes (évite 280 résultats et le PC qui rame)
-    found = found[:60]
+    found = found[:preset["pool"]]
 
     st.session_state["last_results"] = found
     st.session_state["last_query"] = q
     st.session_state["last_errors"] = errors
+    st.session_state["last_mode"] = mode
 
-# --- affichage (tri) ---
+# Affichage
 results = st.session_state.get("last_results")
 if results is not None:
     q = st.session_state.get("last_query", "")
     errors = st.session_state.get("last_errors", [])
+    mode_used = st.session_state.get("last_mode", mode)
 
     if errors:
-        st.warning("⚠️ Debug (utile si ça bug) :\n- " + "\n- ".join(errors[:2]))
+        st.warning("⚠️ Debug :\n- " + "\n- ".join(errors[:2]))
 
-    st.caption(f"Requête: {q}")
+    st.caption(f"Requête: {q} — Mode: {mode_used}")
 
-    sort_mode = st.selectbox(
-        "Trier par",
-        ["Pertinence", "Année (récent)", "Note (haute)"],
-        index=0
-    )
+    sort_mode = st.selectbox("Trier par", ["Pertinence", "Année (récent)", "Note (haute)"], index=0)
+    tnt_auto = st.checkbox("TNT automatique (affiche seulement si trouvé)", value=False)
 
-    # Pré-calcul des notes pour tri (limité pour éviter lenteur OMDb)
     enriched = []
     for i, sh in enumerate(results):
         year = sh.get("releaseYear") or sh.get("firstAirYear") or 0
@@ -619,51 +748,61 @@ if results is not None:
         except Exception:
             year = 0
 
-        # Notes: OMDb peut être lent -> on calcule pour les 25 premiers seulement
-        note_str = ""
-        note_score = None
-        if i < 25:
-            note_str, note_score = parse_critic_scores(sh)
+        # notes : on calcule OMDb seulement sur les N premiers (perfs)
+        score100 = None
+        sources = ""
+        if i < MODE_PRESETS[mode_used]["omdb_top"]:
+            score100, sources = critic_score_and_sources(sh)
         else:
-            # fallback “API rating” si dispo
+            # fallback API
             if isinstance(sh.get("rating"), (int, float)):
-                note_score = float(sh["rating"])
-                note_str = f"📊 {int(note_score)}/100"
+                score100 = float(sh["rating"])
+                sources = f"Score {int(score100)}/100"
 
-        enriched.append((sh, year, note_score, note_str))
+        enriched.append((sh, year, score100, sources))
 
     if sort_mode == "Année (récent)":
         enriched.sort(key=lambda x: x[1], reverse=True)
     elif sort_mode == "Note (haute)":
         enriched.sort(key=lambda x: (x[2] is not None, x[2] or -1), reverse=True)
-    else:
-        # Pertinence = on garde l'ordre déjà trié
-        pass
+    # Pertinence: on garde l’ordre
 
-    st.write(f"✅ Résultats : {len(enriched)} (affichage des 20 premiers)")
+    st.write(f"✅ Résultats : {len(enriched)} (20 affichés)")
 
     country = profile["country"]
     allowed_services = set(profile.get("platform_ids", []))
     show_elsewhere = bool(profile.get("show_elsewhere", False))
 
-    for sh, year, note_score, note_str in enriched[:20]:
+    for sh, year, score100, sources in enriched[:20]:
         title = sh.get("title", "Sans titre")
         overview = sh.get("overview", "")
         poster = get_poster_url(sh)
 
-        c_img, c_txt = st.columns([1, 3])
+        # TNT variants (titre + originalTitle si dispo)
+        title_variants = [title]
+        if sh.get("originalTitle"):
+            title_variants.append(sh["originalTitle"])
 
+        c_img, c_txt = st.columns([1, 3])
         with c_img:
             if poster:
                 st.image(poster, width=140)
-            else:
-                st.markdown("🎞️")
 
         with c_txt:
-            line = f"### {title} ({year if year else ''})"
-            if note_str:
-                line += f" — {note_str}"
-            st.markdown(line)
+            star = stars_html(score100)
+            top_line = f"### {title} ({year if year else ''})"
+            if star:
+                top_line += f" — {star}"
+            st.markdown(top_line, unsafe_allow_html=True)
+            if sources:
+                st.markdown(f"<div class='ff-muted'>{sources}</div>", unsafe_allow_html=True)
+
+            # TNT auto: on affiche uniquement si trouvé
+            if tnt_auto:
+                airings = tnt_find_airings(title_variants, limit=2)
+                if airings:
+                    txt = "TNT : " + " · ".join([f"{a['channel']} {a['start']}-{a['stop']}" for a in airings])
+                    st.markdown(f"<div class='ff-muted'>{txt}</div>", unsafe_allow_html=True)
 
             if overview:
                 st.write(overview)
@@ -675,7 +814,7 @@ if results is not None:
             opts_mine = dedupe_streaming_options(opts_mine)
 
             if opts_mine:
-                st.write("✅ Dispo sur tes applis :")
+                st.write("Dispo sur tes applis :")
                 for o in opts_mine:
                     s = (o.get("service") or {})
                     name = s.get("name", s.get("id", "service"))
@@ -686,7 +825,6 @@ if results is not None:
                     else:
                         st.markdown(f"- **{name}** ({typ})")
             else:
-                st.info("❌ Pas dispo sur tes applis.")
                 if show_elsewhere and opts_all:
                     st.write("Dispo ailleurs :")
                     for o in opts_all:
