@@ -1,43 +1,18 @@
-
 import os
 import re
 import json
 import html
 import base64
 import random
-from datetime import datetime
 from pathlib import Path
-from urllib.parse import quote
-from zoneinfo import ZoneInfo
+from urllib.parse import quote_plus
+from datetime import datetime
 
 import requests
 import streamlit as st
 from dotenv import load_dotenv
 
-# ================== CONFIG ==================
 load_dotenv()
-
-def read_secret(name: str, default: str = "") -> str:
-    val = os.getenv(name, "").strip()
-    if val:
-        return val
-    try:
-        return str(st.secrets.get(name, default)).strip()
-    except Exception:
-        return default
-
-RAPIDAPI_KEY = read_secret("RAPIDAPI_KEY")
-RAPIDAPI_HOST = read_secret("RAPIDAPI_HOST", "streaming-availability.p.rapidapi.com")
-BASE_URL = "https://streaming-availability.p.rapidapi.com"
-OMDB_API_KEY = read_secret("OMDB_API_KEY")
-OLLAMA_URL = read_secret("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = read_secret("OLLAMA_MODEL", "llama3.2:3b")
-TMDB_API_KEY = read_secret("TMDB_API_KEY")
-TMDB_BEARER_TOKEN = read_secret("TMDB_BEARER_TOKEN")
-TMDB_BASE_URL = "https://api.themoviedb.org/3"
-TMDB_IMAGE_BASE = read_secret("TMDB_IMAGE_BASE", "https://image.tmdb.org/t/p/original").rstrip("/")
-WIKIDATA_SPARQL_URL = "https://query.wikidata.org/sparql"
-APP_TZ = ZoneInfo("Europe/Paris")
 
 APP_DIR = Path(__file__).parent
 PROFILE_PATH = APP_DIR / "profile.json"
@@ -45,378 +20,131 @@ BG_DIR = APP_DIR / "bg"
 
 st.set_page_config(page_title="FilmFinder IA", layout="centered")
 
-# ================== THEME ==================
-VARIANT = "A"
-THEMES = {
-    "A": {
-        "name": "Bulles Messenger",
-        "accent": "#ff4f5f",
-        "accent_soft": "rgba(255,79,95,0.12)",
-        "bubble_bg": "rgba(255,255,255,0.94)",
-        "bubble_border": "rgba(255,255,255,0.82)",
-        "bubble_shadow": "0 12px 30px rgba(19, 24, 38, 0.10)",
-        "bubble_radius": "24px",
-        "card_bg": "rgba(255,255,255,0.95)",
-        "card_border": "rgba(255,255,255,0.85)",
-        "page_scrim": "linear-gradient(rgba(236,240,245,0.30), rgba(236,240,245,0.36))",
-    },
-    "B": {
-        "name": "Compact Pro",
-        "accent": "#ee4040",
-        "accent_soft": "rgba(238,64,64,0.10)",
-        "bubble_bg": "rgba(255,255,255,0.96)",
-        "bubble_border": "rgba(205,214,227,0.92)",
-        "bubble_shadow": "0 8px 18px rgba(20, 24, 35, 0.08)",
-        "bubble_radius": "18px",
-        "card_bg": "rgba(255,255,255,0.97)",
-        "card_border": "rgba(208,216,228,0.96)",
-        "page_scrim": "linear-gradient(rgba(237,241,246,0.88), rgba(237,241,246,0.90))",
-    },
-    "C": {
-        "name": "Glass Chat",
-        "accent": "#845ef7",
-        "accent_soft": "rgba(132,94,247,0.14)",
-        "bubble_bg": "rgba(255,255,255,0.72)",
-        "bubble_border": "rgba(255,255,255,0.58)",
-        "bubble_shadow": "0 14px 34px rgba(26, 31, 43, 0.16)",
-        "bubble_radius": "26px",
-        "card_bg": "rgba(255,255,255,0.78)",
-        "card_border": "rgba(255,255,255,0.55)",
-        "page_scrim": "linear-gradient(rgba(229,233,240,0.64), rgba(229,233,240,0.74))",
-    },
-}
-THEME = THEMES[VARIANT]
+TMDB_API_KEY = os.getenv("TMDB_API_KEY", "").strip()
+TMDB_BEARER_TOKEN = os.getenv("TMDB_BEARER_TOKEN", "").strip()
+try:
+    TMDB_API_KEY = st.secrets.get("TMDB_API_KEY", TMDB_API_KEY)
+    TMDB_BEARER_TOKEN = st.secrets.get("TMDB_BEARER_TOKEN", TMDB_BEARER_TOKEN)
+except Exception:
+    pass
 
-# ================== SERVICES ==================
+TMDB_BASE = "https://api.themoviedb.org/3"
+TMDB_IMG = "https://image.tmdb.org/t/p"
+
 SERVICE_CATALOG = [
-    {"id": "netflix", "name": "Netflix", "aliases": ["netflix"]},
-    {"id": "prime", "name": "Prime Video", "aliases": ["prime", "prime video", "amazon prime", "amazon prime video"]},
-    {"id": "disney", "name": "Disney+", "aliases": ["disney", "disney+"]},
-    {"id": "max", "name": "HBO Max", "aliases": ["max", "hbo", "hbo max", "hbomax"]},
-    {"id": "apple", "name": "Apple TV+", "aliases": ["apple", "apple tv", "apple tv+"]},
-    {"id": "paramount", "name": "Paramount+", "aliases": ["paramount", "paramount+"]},
-    {"id": "canal", "name": "Canal+", "aliases": ["canal", "canal+"]},
-    {"id": "arte", "name": "Arte", "aliases": ["arte"]},
-    {"id": "france.tv", "name": "France TV", "aliases": ["france tv", "francetv", "france.tv"]},
-    {"id": "molotov", "name": "Molotov", "aliases": ["molotov"]},
-    {"id": "rakuten", "name": "Rakuten TV", "aliases": ["rakuten", "rakuten tv"]},
-    {"id": "youtube", "name": "YouTube", "aliases": ["youtube", "youtube movies"]},
+    {"id": "netflix", "name": "Netflix", "aliases": ["netflix"], "tmdb": [8]},
+    {"id": "prime", "name": "Prime Video", "aliases": ["prime", "prime video", "amazon prime", "amazon prime video"], "tmdb": [9, 10, 119]},
+    {"id": "disney", "name": "Disney+", "aliases": ["disney", "disney+"], "tmdb": [337]},
+    {"id": "max", "name": "HBO Max", "aliases": ["max", "hbo", "hbo max", "hbomax"], "tmdb": [1899, 384]},
+    {"id": "apple", "name": "Apple TV+", "aliases": ["apple", "apple tv", "apple tv+"], "tmdb": [350]},
+    {"id": "paramount", "name": "Paramount+", "aliases": ["paramount", "paramount+"], "tmdb": [531, 582]},
+    {"id": "canal", "name": "Canal+", "aliases": ["canal", "canal+"], "tmdb": [381]},
+    {"id": "arte", "name": "Arte", "aliases": ["arte"], "tmdb": []},
+    {"id": "france.tv", "name": "France TV", "aliases": ["france tv", "francetv", "france.tv"], "tmdb": []},
+    {"id": "molotov", "name": "Molotov", "aliases": ["molotov"], "tmdb": []},
+    {"id": "rakuten", "name": "Rakuten TV", "aliases": ["rakuten", "rakuten tv"], "tmdb": [35]},
+    {"id": "youtube", "name": "YouTube", "aliases": ["youtube", "youtube movies"], "tmdb": [192]},
 ]
 SERVICE_BY_ID = {s["id"]: s for s in SERVICE_CATALOG}
 SERVICE_NAMES = [s["name"] for s in SERVICE_CATALOG]
 NAME_TO_ID = {s["name"]: s["id"] for s in SERVICE_CATALOG}
 
+GENRES_MOVIE = {
+    28: "Action", 12: "Aventure", 16: "Animation", 35: "Comédie", 80: "Crime", 99: "Documentaire",
+    18: "Drame", 10751: "Famille", 14: "Fantastique", 36: "Histoire", 27: "Horreur", 10402: "Musique",
+    9648: "Mystère", 10749: "Romance", 878: "Science-fiction", 10770: "Téléfilm", 53: "Thriller",
+    10752: "Guerre", 37: "Western"
+}
+GENRES_TV = {
+    10759: "Action", 16: "Animation", 35: "Comédie", 80: "Crime", 99: "Documentaire", 18: "Drame",
+    10751: "Famille", 10762: "Enfants", 9648: "Mystère", 10763: "Actualités", 10764: "Téléréalité",
+    10765: "Science-fiction", 10766: "Soap", 10767: "Talk", 10768: "Guerre", 37: "Western"
+}
+GENRES_UI = sorted({*GENRES_MOVIE.values(), *GENRES_TV.values()})
+YEARS_UI = [str(y) for y in range(datetime.now().year, 1989, -1)]
 STOPWORDS = {
     "le","la","les","un","une","des","de","du","dans","sur","avec","sans","et","ou",
     "qui","que","quoi","dont","au","aux","en","a","à","pour","par","se","sa","son","ses",
-    "je","tu","il","elle","on","nous","vous","ils","elles","toujours",
+    "je","tu","il","elle","on","nous","vous","ils","elles","toujours","film","serie","série",
     "the","a","an","and","or","in","on","with","without","to","of","for","by","from"
 }
 
-GENRES = [
-    "Action", "Aventure", "Animation", "Comédie", "Crime", "Documentaire", "Drame", "Famille",
-    "Fantastique", "Guerre", "Horreur", "Mystère", "Romance", "Science-fiction", "Thriller", "Western"
-]
-YEARS = [str(y) for y in range(2025, 2009, -1)]
-
-_COUNTRY_MAP = {
-    "france":"FR","fr":"FR",
-    "united states":"US","usa":"US","us":"US","etats unis":"US","états unis":"US",
-    "united kingdom":"GB","uk":"GB","gb":"GB","royaume uni":"GB",
-    "japan":"JP","japon":"JP","jp":"JP",
-    "korea":"KR","south korea":"KR","corée":"KR","coree":"KR","kr":"KR",
-    "spain":"ES","espagne":"ES","es":"ES",
-    "italy":"IT","italie":"IT","it":"IT",
-    "germany":"DE","allemagne":"DE","de":"DE",
-    "canada":"CA","ca":"CA",
-    "australia":"AU","au":"AU",
-    "china":"CN","chine":"CN","cn":"CN",
-    "india":"IN","inde":"IN","in":"IN",
-    "brazil":"BR","bresil":"BR","brésil":"BR","br":"BR",
-    "mexico":"MX","mexique":"MX","mx":"MX",
-    "netherlands":"NL","pays bas":"NL","nl":"NL",
-    "belgium":"BE","belgique":"BE","be":"BE",
-    "switzerland":"CH","suisse":"CH","ch":"CH",
-}
-
-# ================== STATE ==================
 st.session_state.setdefault("entered", False)
 st.session_state.setdefault("page", "Accueil")
-st.session_state.setdefault("do_search", False)
-st.session_state.setdefault("last_results", None)
-st.session_state.setdefault("last_query", "")
-st.session_state.setdefault("last_mode", "Normal")
+st.session_state.setdefault("q_main", "")
+st.session_state.setdefault("q_more", "")
+st.session_state.setdefault("mode", "Normal")
 st.session_state.setdefault("sort_mode", "Pertinence")
+st.session_state.setdefault("mine_only", False)
+st.session_state.setdefault("selected_genres", [])
+st.session_state.setdefault("selected_years", [])
+st.session_state.setdefault("last_results", [])
+st.session_state.setdefault("last_query", "")
 st.session_state.setdefault("scroll_results", False)
-st.session_state.setdefault("api_preview_notice", "")
-st.session_state.setdefault("api_error_notice", "")
-st.session_state.setdefault("bg_image_name", "")
-st.session_state.setdefault("bg_source", "")
-st.session_state.setdefault("bg_event_label", "")
-st.session_state.setdefault("bg_movie_title", "")
-st.session_state.setdefault("bg_refresh_nonce", 0)
+st.session_state.setdefault("bg_name", "")
+st.session_state.setdefault("notice", "")
 
-# ================== PROFILE ==================
+
 def load_profile():
     if PROFILE_PATH.exists():
         try:
-            p = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
-            p.setdefault("country", "fr")
-            p.setdefault("lang", "fr")
-            p.setdefault("show_type", "movie")
-            p.setdefault("platform_ids", [])
-            p.setdefault("show_elsewhere", False)
-            if p.get("show_type") == "all":
-                p["show_type"] = "movie"
-            if p.get("show_type") not in ("movie", "series"):
-                p["show_type"] = "movie"
-            return p
+            data = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+            data.setdefault("country", "FR")
+            data.setdefault("lang", "fr-FR")
+            data.setdefault("show_type", "movie")
+            data.setdefault("platform_ids", ["netflix", "prime", "disney", "max"])
+            data.setdefault("show_elsewhere", False)
+            return data
         except Exception:
             pass
     return {
-        "country": "fr",
-        "lang": "fr",
+        "country": "FR",
+        "lang": "fr-FR",
         "show_type": "movie",
         "platform_ids": ["netflix", "prime", "disney", "max"],
         "show_elsewhere": False,
     }
 
+
 def save_profile(profile):
     PROFILE_PATH.write_text(json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
 
+
 profile = load_profile()
 
-# ================== HELPERS ==================
+
 def norm_text(s: str) -> str:
     if not s:
         return ""
     s = s.lower().strip()
     s = re.sub(r"[’']", "'", s)
     s = re.sub(r"[^a-z0-9àâçéèêëîïôùûüÿñæœ'\s\-\.]", " ", s, flags=re.I)
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
+    return re.sub(r"\s+", " ", s).strip()
+
 
 def escape(s: str) -> str:
     return html.escape(s or "", quote=True)
 
-def stars_html(score_0_100):
-    if score_0_100 is None:
-        return ""
-    try:
-        pct = max(0.0, min(100.0, float(score_0_100)))
-    except Exception:
-        return ""
-    return (
-        f'<span class="ff-stars">'
-        f'  <span class="top" style="width:{pct}%">★★★★★</span>'
-        f'  <span class="bot">★★★★★</span>'
-        f'</span>'
-    )
-
-def flag_from_iso2(code2: str) -> str:
-    if not code2 or len(code2) != 2:
-        return ""
-    code2 = code2.upper()
-    if not ("A" <= code2[0] <= "Z" and "A" <= code2[1] <= "Z"):
-        return ""
-    return chr(0x1F1E6 + ord(code2[0]) - ord("A")) + chr(0x1F1E6 + ord(code2[1]) - ord("A"))
-
-def iso2_from_country_text(country_text: str) -> str:
-    if not country_text:
-        return ""
-    first = country_text.split(",")[0].strip()
-    if first.upper() == "USA":
-        return "US"
-    if first.upper() == "UK":
-        return "GB"
-    if len(first) == 2:
-        return first.upper()
-    return _COUNTRY_MAP.get(norm_text(first), "")
-
-def extract_keywords(text: str, max_words: int = 10) -> str:
-    words = re.findall(r"[a-zA-ZÀ-ÿ0-9']+", text.lower())
-    words = [w for w in words if len(w) >= 4 and w not in STOPWORDS]
-    out = []
-    for w in words:
-        if w not in out:
-            out.append(w)
-        if len(out) >= max_words:
-            break
-    return " ".join(out) if out else text.strip()
-
-def heuristic_titles_from_query(q: str):
-    nq = norm_text(q)
-    titles = []
-    time_loop = any(x in nq for x in ["boucle", "revit", "revivre", "meme journee", "même journée", "rena", "ressusc", "time loop", "loop"])
-    tom = "tom cruise" in nq
-    alien = any(x in nq for x in ["extraterrestre", "alien"])
-    if time_loop:
-        titles += ["Edge of Tomorrow", "Un jour sans fin", "Happy Death Day", "Palm Springs"]
-    if tom:
-        titles.insert(0, "Edge of Tomorrow")
-        titles += ["Live Die Repeat"]
-    if alien and time_loop and "Edge of Tomorrow" not in titles:
-        titles.insert(0, "Edge of Tomorrow")
-    out = []
-    for t in titles:
-        if t and t not in out:
-            out.append(t)
-    return out
-
-def stable_id(sh: dict) -> str:
-    return str(
-        sh.get("id")
-        or sh.get("imdbId")
-        or sh.get("tmdbId")
-        or (sh.get("title", "") + "_" + str(sh.get("releaseYear") or sh.get("firstAirYear") or ""))
-    )
-
-def dedupe_streaming_options(options):
-    seen, out = set(), []
-    for o in options or []:
-        service = o.get("service") or {}
-        sid = service.get("id") or service.get("name") or ""
-        typ = o.get("type") or ""
-        link = o.get("link") or o.get("videoLink") or ""
-        key = (norm_text(str(sid)), norm_text(str(typ)), norm_text(str(link)))
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(o)
-    return out
-
-def normalize_service_tokens(value: str):
-    text = norm_text(value).replace(".", " ").replace("_", " ")
-    text = text.replace("subscription", " ").replace("addon", " ").replace("channel", " ")
-    text = text.replace("amazon", "prime").replace("hbomax", "hbo max")
-    text = re.sub(r"\s+", " ", text).strip()
-    return set(text.split()) | {text}
-
-def option_on_my_services(option: dict, selected_ids):
-    service = option.get("service") or {}
-    raw_candidates = [
-        str(service.get("id") or ""),
-        str(service.get("name") or ""),
-        str(service.get("homePage") or ""),
-    ]
-    tokens = set()
-    for raw in raw_candidates:
-        tokens |= normalize_service_tokens(raw)
-    for sid in selected_ids:
-        meta = SERVICE_BY_ID.get(sid, {"aliases": [sid]})
-        alias_tokens = set()
-        for alias in meta.get("aliases", []):
-            alias_tokens |= normalize_service_tokens(alias)
-        alias_tokens |= normalize_service_tokens(meta.get("name", sid))
-        if tokens & alias_tokens:
-            return True
-    return False
-
-def get_poster_url(show: dict):
-    try:
-        vs = (show.get("imageSet") or {}).get("verticalPoster") or {}
-        return vs.get("w240") or vs.get("w360") or vs.get("w480") or None
-    except Exception:
-        return None
-
-def merge_results(items):
-    merged = {}
-    for sh in items:
-        merged[stable_id(sh)] = sh
-    return list(merged.values())
-
-def relevance_score(sh: dict, q: str, actor_hint: str = "") -> float:
-    hay = norm_text((sh.get("title") or "") + " " + (sh.get("overview") or ""))
-    qn = norm_text(q)
-    words = [w for w in qn.split() if len(w) >= 4 and w not in STOPWORDS]
-    score = 0.0
-    for w in set(words):
-        if w in hay:
-            score += 1.0
-    if any(x in qn for x in ["boucle", "revit", "revivre", "meme journee", "même journée", "ressusc", "rena"]):
-        if any(x in hay for x in ["loop", "time loop", "revit", "revivre", "ressusc", "rena", "day repeats", "repeat the day"]):
-            score += 3.0
-    if any(x in qn for x in ["extraterrestre", "alien"]):
-        if any(x in hay for x in ["alien", "extraterrestre", "invasion", "space"]):
-            score += 2.2
-    title_n = norm_text(sh.get("title", ""))
-    if "edge of tomorrow" in title_n or "live die repeat" in title_n:
-        if any(x in qn for x in ["tom cruise", "extraterrestre", "revit", "rena", "ressusc", "journee", "journée", "loop"]):
-            score += 4.0
-    if actor_hint:
-        actors = " ".join([norm_text(a) for a in actors_list_from_omdb(sh)])
-        if actor_hint in actors:
-            score += 4.0
-    return score
-
-def parse_year_value(show):
-    year = show.get("releaseYear") or show.get("firstAirYear") or 0
-    try:
-        return int(year or 0)
-    except Exception:
-        return 0
-
-# ================== BACKGROUND ==================
 
 def list_bg_images():
-    env_dir = os.getenv("FILMFINDER_BG_DIR", "").strip()
-    candidate_dirs = []
-    if env_dir:
-        candidate_dirs.append(Path(env_dir))
-    candidate_dirs.extend([
-        BG_DIR,
-        APP_DIR / "BG",
-        Path.cwd() / "bg",
-        Path.cwd() / "BG",
-        APP_DIR.parent / "bg",
-        APP_DIR.parent / "BG",
-        Path(r"C:\Users\TEST\FilmFinderIA\bg"),
-    ])
+    found = []
+    if BG_DIR.exists() and BG_DIR.is_dir():
+        for p in sorted(BG_DIR.rglob("*")):
+            if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
+                found.append(p)
+    return found
 
-    files = []
-    seen = set()
-    for d in candidate_dirs:
-        try:
-            if not d.exists() or not d.is_dir():
-                continue
-            for p in sorted(d.rglob("*")):
-                if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
-                    key = str(p.resolve())
-                    if key not in seen:
-                        seen.add(key)
-                        files.append(p)
-        except Exception:
-            continue
-    return files
-
-def pick_bg_image():
-    bg_files = list_bg_images()
-    st.session_state["bg_count"] = len(bg_files)
-    if not bg_files:
-        st.session_state["bg_image_name"] = ""
-        return None
-
-    saved_name = st.session_state.get("bg_image_name", "")
-    chosen = None
-    if saved_name:
-        for f in bg_files:
-            if f.name == saved_name:
-                chosen = f
-                break
-    if chosen is None:
-        chosen = random.choice(bg_files)
-        st.session_state["bg_image_name"] = chosen.name
-    return chosen
 
 def file_to_data_uri(path: Path):
     try:
         ext = path.suffix.lower().lstrip(".")
         if ext == "jpg":
             ext = "jpeg"
-        data = base64.b64encode(path.read_bytes()).decode("ascii")
-        return f"data:image/{ext};base64,{data}"
+        raw = base64.b64encode(path.read_bytes()).decode("ascii")
+        return f"data:image/{ext};base64,{raw}"
     except Exception:
         return ""
+
 
 def demo_bg_data_uri():
     svg = """
@@ -424,279 +152,42 @@ def demo_bg_data_uri():
       <defs>
         <linearGradient id='bg' x1='0' y1='0' x2='1' y2='1'>
           <stop offset='0%' stop-color='#0f172a'/>
-          <stop offset='38%' stop-color='#1e293b'/>
-          <stop offset='100%' stop-color='#111827'/>
+          <stop offset='100%' stop-color='#0b1324'/>
         </linearGradient>
-        <radialGradient id='glow1'>
-          <stop offset='0%' stop-color='#f59e0b' stop-opacity='0.65'/>
-          <stop offset='100%' stop-color='#f59e0b' stop-opacity='0'/>
-        </radialGradient>
-        <radialGradient id='glow2'>
-          <stop offset='0%' stop-color='#60a5fa' stop-opacity='0.55'/>
-          <stop offset='100%' stop-color='#60a5fa' stop-opacity='0'/>
-        </radialGradient>
-        <radialGradient id='glow3'>
-          <stop offset='0%' stop-color='#ec4899' stop-opacity='0.40'/>
-          <stop offset='100%' stop-color='#ec4899' stop-opacity='0'/>
-        </radialGradient>
-        <filter id='blur24'><feGaussianBlur stdDeviation='24'/></filter>
         <filter id='blur40'><feGaussianBlur stdDeviation='40'/></filter>
-        <filter id='posterBlur'><feGaussianBlur stdDeviation='8'/></filter>
       </defs>
       <rect width='1080' height='1920' fill='url(#bg)'/>
-      <circle cx='160' cy='260' r='280' fill='url(#glow1)' filter='url(#blur40)'/>
-      <circle cx='930' cy='360' r='280' fill='url(#glow2)' filter='url(#blur40)'/>
-      <circle cx='780' cy='1480' r='240' fill='url(#glow3)' filter='url(#blur40)'/>
-      <g opacity='0.46' filter='url(#posterBlur)'>
-        <rect x='55' y='120' width='205' height='300' rx='16' fill='#7f1d1d'/>
-        <rect x='290' y='90' width='220' height='330' rx='16' fill='#1d4ed8'/>
-        <rect x='540' y='130' width='185' height='280' rx='16' fill='#6d28d9'/>
-        <rect x='760' y='85' width='250' height='350' rx='16' fill='#0f766e'/>
-        <rect x='85' y='500' width='200' height='300' rx='16' fill='#374151'/>
-        <rect x='330' y='480' width='230' height='340' rx='16' fill='#9a3412'/>
-        <rect x='610' y='520' width='195' height='290' rx='16' fill='#0f172a'/>
-        <rect x='825' y='495' width='170' height='265' rx='16' fill='#a21caf'/>
-        <rect x='70' y='885' width='210' height='320' rx='16' fill='#0f766e'/>
-        <rect x='315' y='870' width='245' height='350' rx='16' fill='#1e3a8a'/>
-        <rect x='610' y='900' width='190' height='300' rx='16' fill='#b91c1c'/>
-        <rect x='830' y='860' width='185' height='280' rx='16' fill='#9333ea'/>
+      <g opacity='0.38' filter='url(#blur40)'>
+        <rect x='45' y='120' width='210' height='320' rx='22' fill='#ef4444'/>
+        <rect x='300' y='100' width='240' height='360' rx='22' fill='#3b82f6'/>
+        <rect x='600' y='130' width='180' height='280' rx='22' fill='#8b5cf6'/>
+        <rect x='820' y='90' width='220' height='340' rx='22' fill='#14b8a6'/>
+        <rect x='70' y='540' width='200' height='300' rx='22' fill='#0ea5e9'/>
+        <rect x='330' y='500' width='230' height='340' rx='22' fill='#f97316'/>
+        <rect x='620' y='560' width='190' height='300' rx='22' fill='#64748b'/>
+        <rect x='850' y='620' width='180' height='280' rx='22' fill='#ec4899'/>
       </g>
-      <rect x='0' y='0' width='1080' height='1920' fill='rgba(255,255,255,0.04)'/>
-      <rect x='0' y='0' width='1080' height='1920' fill='rgba(0,0,0,0.18)'/>
+      <rect width='1080' height='1920' fill='rgba(0,0,0,0.32)'/>
     </svg>
     """.strip()
-    data = base64.b64encode(svg.encode("utf-8")).decode("ascii")
-    return f"data:image/svg+xml;base64,{data}"
+    raw = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{raw}"
 
-# ================== THEME APPLY ==================
-def tmdb_has_auth() -> bool:
-    return bool(TMDB_API_KEY or TMDB_BEARER_TOKEN)
 
-def tmdb_get(path: str, params=None, timeout: int = 20):
-    if not tmdb_has_auth():
-        raise RuntimeError("TMDB_API_KEY ou TMDB_BEARER_TOKEN manquant")
-    params = dict(params or {})
-    headers = {"Accept": "application/json"}
-    if TMDB_BEARER_TOKEN:
-        headers["Authorization"] = f"Bearer {TMDB_BEARER_TOKEN}"
-    else:
-        params["api_key"] = TMDB_API_KEY
-    r = requests.get(f"{TMDB_BASE_URL}{path}", params=params, headers=headers, timeout=timeout)
-    if not r.ok:
-        raise RuntimeError(f"TMDB ERROR {r.status_code}: {r.text[:240]}")
-    return r.json()
-
-def tmdb_image_url(path_value: str) -> str:
-    if not path_value:
-        return ""
-    return f"{TMDB_IMAGE_BASE}/{str(path_value).lstrip('/')}"
-
-def _today_parts(day_key: str):
-    base = str(day_key)[:10]
-    dt = datetime.fromisoformat(base)
-    return dt.month, dt.day
-
-@st.cache_data(show_spinner=False, ttl=21600)
-def wikidata_today_cinema_events(day_key: str):
-    month, day = _today_parts(day_key)
-    query = f"""
-    SELECT ?person ?personLabel ?eventType ?year ?imdb WHERE {{
-      VALUES ?occupation {{ wd:Q33999 wd:Q2526255 wd:Q28389 wd:Q2405480 wd:Q10800557 }}
-      {{
-        ?person wdt:P31 wd:Q5 ;
-                wdt:P106/wdt:P279* ?occupation ;
-                wdt:P569 ?date .
-        FILTER(MONTH(?date) = {month} && DAY(?date) = {day})
-        BIND("birth" AS ?eventType)
-        BIND(YEAR(?date) AS ?year)
-      }}
-      UNION
-      {{
-        ?person wdt:P31 wd:Q5 ;
-                wdt:P106/wdt:P279* ?occupation ;
-                wdt:P570 ?date .
-        FILTER(MONTH(?date) = {month} && DAY(?date) = {day})
-        BIND("death" AS ?eventType)
-        BIND(YEAR(?date) AS ?year)
-      }}
-      OPTIONAL {{ ?person wdt:P345 ?imdb. }}
-      SERVICE wikibase:label {{ bd:serviceParam wikibase:language "fr,en". }}
-    }}
-    LIMIT 40
-    """
-    try:
-        r = requests.get(
-            WIKIDATA_SPARQL_URL,
-            params={"format": "json", "query": query},
-            headers={"Accept": "application/sparql-results+json", "User-Agent": "FilmFinderIA/1.0"},
-            timeout=25,
-        )
-        if not r.ok:
-            return []
-        data = r.json()
-    except Exception:
-        return []
-
-    out = []
-    for row in (((data or {}).get("results") or {}).get("bindings") or []):
-        label = (((row.get("personLabel") or {}).get("value")) or "").strip()
-        if not label:
-            continue
-        out.append({
-            "name": label,
-            "event_type": (((row.get("eventType") or {}).get("value")) or "birth").strip(),
-            "year": (((row.get("year") or {}).get("value")) or "").strip(),
-            "imdb": (((row.get("imdb") or {}).get("value")) or "").strip(),
-        })
-
-    uniq = []
-    seen = set()
-    for item in out:
-        key = (norm_text(item["name"]), item["event_type"], item["year"])
-        if key not in seen:
-            seen.add(key)
-            uniq.append(item)
-    return uniq
-
-@st.cache_data(show_spinner=False, ttl=21600)
-def tmdb_search_person(name: str, lang: str = "fr-FR"):
-    data = tmdb_get("/search/person", {"query": name, "language": lang, "include_adult": "false"})
-    results = (data or {}).get("results") or []
-    return results[0] if results else None
-
-@st.cache_data(show_spinner=False, ttl=21600)
-def tmdb_person_combined_credits(person_id: int, lang: str = "fr-FR"):
-    data = tmdb_get(f"/person/{person_id}/combined_credits", {"language": lang})
-    return data or {}
-
-def pick_credit_from_combined(data: dict):
-    pool = []
-    for group_name in ("cast", "crew"):
-        for item in (data.get(group_name) or []):
-            media_type = item.get("media_type") or "movie"
-            if media_type not in ("movie", "tv"):
-                continue
-            title = item.get("title") or item.get("name") or ""
-            if not title:
-                continue
-            backdrop = item.get("backdrop_path") or ""
-            poster = item.get("poster_path") or ""
-            popularity = float(item.get("popularity") or 0.0)
-            vote_count = int(item.get("vote_count") or 0)
-            vote_average = float(item.get("vote_average") or 0.0)
-            date_value = item.get("release_date") or item.get("first_air_date") or ""
-            year = 0
-            try:
-                year = int(str(date_value)[:4])
-            except Exception:
-                year = 0
-            score = popularity * 4.0 + vote_count * 0.04 + vote_average * 2.0
-            if media_type == "movie":
-                score += 35
-            if backdrop:
-                score += 25
-            elif poster:
-                score += 10
-            if year >= 1980:
-                score += min(10, (year - 1980) / 5.0)
-            item_copy = dict(item)
-            item_copy["_ff_pick_score"] = score
-            pool.append(item_copy)
-    if not pool:
-        return None
-    pool.sort(key=lambda x: (x.get("_ff_pick_score", 0), x.get("vote_count") or 0, x.get("popularity") or 0), reverse=True)
-    return pool[0]
-
-@st.cache_data(show_spinner=False, ttl=21600)
-def tmdb_trending_background(day_key: str, lang: str = "fr-FR"):
-    data = tmdb_get("/trending/movie/day", {"language": lang})
-    for item in (data or {}).get("results") or []:
-        img = tmdb_image_url(item.get("backdrop_path") or item.get("poster_path") or "")
-        if not img:
-            continue
-        title = item.get("title") or item.get("original_title") or "Film du moment"
-        return {
-            "image_url": img,
-            "movie_title": title,
-            "event_label": "Film populaire du moment",
-            "source": "tmdb_trending",
-        }
-    return {}
-
-@st.cache_data(show_spinner=False, ttl=21600)
-def tmdb_daily_cinema_background(day_key: str, lang: str = "fr-FR"):
-    events = wikidata_today_cinema_events(day_key)
-    if events:
-        seed = int(day_key.replace("-", ""))
-        rng = random.Random(seed)
-        ordered = list(events)
-        rng.shuffle(ordered)
-        for event in ordered[:10]:
-            try:
-                person = tmdb_search_person(event["name"], lang=lang)
-                if not person:
-                    continue
-                credits = tmdb_person_combined_credits(int(person.get("id")), lang=lang)
-                picked = pick_credit_from_combined(credits)
-                if not picked:
-                    continue
-                img = tmdb_image_url(picked.get("backdrop_path") or picked.get("poster_path") or "")
-                if not img:
-                    continue
-                event_word = "Anniversaire" if event.get("event_type") == "birth" else "Hommage"
-                person_name = event["name"]
-                year = event.get("year") or ""
-                year_txt = f" ({year})" if year else ""
-                movie_title = picked.get("title") or picked.get("name") or ""
-                return {
-                    "image_url": img,
-                    "movie_title": movie_title,
-                    "event_label": f"{event_word} {person_name}{year_txt}",
-                    "source": "wikidata_tmdb",
-                }
-            except Exception:
-                continue
-    try:
-        return tmdb_trending_background(day_key, lang=lang)
-    except Exception:
-        return {}
-
-def pick_dynamic_background():
-    lang_code = "fr-FR"
-    try:
-        lang_code = "fr-FR" if profile.get("lang", "fr") == "fr" else "en-US"
-    except Exception:
-        pass
-
-    day_key = datetime.now(APP_TZ).strftime("%Y-%m-%d") + f"-{int(st.session_state.get('bg_refresh_nonce', 0))}"
-    if tmdb_has_auth():
-        info = tmdb_daily_cinema_background(day_key, lang=lang_code)
-        if info and info.get("image_url"):
-            st.session_state["bg_source"] = "TMDb + Wikidata" if info.get("source") == "wikidata_tmdb" else "TMDb"
-            st.session_state["bg_event_label"] = info.get("event_label", "")
-            st.session_state["bg_movie_title"] = info.get("movie_title", "")
-            st.session_state["bg_image_name"] = info.get("movie_title", "")
-            return info.get("image_url")
-
-    bg_path = pick_bg_image()
-    if bg_path:
-        st.session_state["bg_source"] = "Dossier bg"
-        st.session_state["bg_event_label"] = ""
-        st.session_state["bg_movie_title"] = ""
-        return file_to_data_uri(bg_path)
-
-    st.session_state["bg_source"] = "Démo"
-    st.session_state["bg_event_label"] = ""
-    st.session_state["bg_movie_title"] = ""
+def pick_bg():
+    bg_files = list_bg_images()
+    if bg_files:
+        selected = next((p for p in bg_files if p.name == st.session_state.get("bg_name")), None)
+        if selected is None:
+            selected = random.choice(bg_files)
+            st.session_state["bg_name"] = selected.name
+        return file_to_data_uri(selected)
+    st.session_state["bg_name"] = ""
     return demo_bg_data_uri()
 
-def apply_theme():
-    bg_uri = pick_dynamic_background()
-    if bg_uri:
-        background_rule = f"background-image: linear-gradient(rgba(18,23,34,0.34), rgba(18,23,34,0.28)), url('{bg_uri}'); background-size: cover; background-position: center center;"
-    else:
-        background_rule = "background: linear-gradient(rgba(18,23,34,0.34), rgba(18,23,34,0.28));"
 
+def apply_theme():
+    bg = pick_bg()
     css = f"""
     <style>
     html, body, .stApp, [data-testid='stAppViewContainer'] {{
@@ -708,978 +199,585 @@ def apply_theme():
         position: fixed;
         inset: 0;
         z-index: -2;
-        {background_rule}
-        filter: saturate(1.04);
+        background-image: linear-gradient(rgba(10,15,30,0.32), rgba(10,15,30,0.28)), url('{bg}');
+        background-size: cover;
+        background-position: center center;
+        filter: saturate(1.02);
     }}
-    [data-testid='stHeader'] {{
-        background: rgba(0,0,0,0) !important;
-    }}
-    .main .block-container {{
-        max-width: 1020px !important;
-        padding-top: 16px !important;
-        padding-bottom: 90px !important;
-        background: transparent !important;
-    }}
+    [data-testid='stHeader'] {{ background: transparent !important; }}
+    .main .block-container {{ max-width: 980px !important; padding-top: 10px !important; padding-bottom: 90px !important; }}
 
-    .ff-title-pill,
-    .ff-pill,
-    .ff-inline-note,
-    .ff-radio-shell,
-    .ff-checkbox-shell {{
+    .ff-pill, .ff-bubble, .ff-title-pill {{
         display: inline-block;
-        background: rgba(255,255,255,0.94);
-        border: 1px solid rgba(255,255,255,0.82);
-        border-radius: 22px;
-        box-shadow: 0 12px 30px rgba(19, 24, 38, 0.10);
+        background: rgba(255,255,255,0.92);
+        border: 1px solid rgba(255,255,255,0.78);
+        border-radius: 24px;
+        box-shadow: 0 12px 28px rgba(12, 18, 31, 0.12);
         backdrop-filter: blur(12px);
-    }}
-    .ff-title-pill {{
-        padding: 10px 18px;
-        margin: 0 0 10px 0;
-        border-radius: 20px;
-    }}
-    .ff-title {{
-        margin: 0;
         color: #17233b;
-        font-size: 2.5rem;
-        line-height: 1;
-        font-weight: 800;
     }}
+    .ff-title-pill {{ padding: 12px 20px; margin-bottom: 12px; }}
+    .ff-title-pill h1 {{ margin: 0; font-size: 2.4rem; line-height: 1; font-weight: 800; }}
     .ff-subtitle {{
-        display: inline-block;
-        padding: 10px 14px;
-        border-radius: 18px;
-        background: rgba(255,255,255,0.80);
-        color: rgba(23,35,59,0.82);
-        margin: 0 0 14px 0;
-        box-shadow: 0 10px 22px rgba(19,24,38,0.08);
-        backdrop-filter: blur(10px);
+        display: inline-block; padding: 10px 14px; margin-bottom: 16px; border-radius: 18px;
+        background: rgba(255,255,255,0.82); color: rgba(23,35,59,0.85);
+        backdrop-filter: blur(10px); box-shadow: 0 10px 22px rgba(12,18,31,0.08);
     }}
-    .ff-pill {{
-        padding: 6px 12px;
-        margin: 6px 0 6px 0;
-        color: #17233b;
-        font-weight: 700;
-        border-radius: 999px;
-    }}
-    .ff-inline-note {{
-        padding: 9px 12px;
-        margin: 4px 0 10px 0;
-        color: rgba(23,35,59,0.88);
-        border-radius: 18px;
-    }}
+    .ff-pill {{ padding: 6px 14px; margin: 0 0 8px 0; font-weight: 700; }}
+    .ff-bubble {{ display:block; width: fit-content; max-width: 100%; padding: 10px 16px; margin: 0 0 10px 0; }}
+    .ff-wide {{ display:block; width:100%; padding: 12px 16px; }}
+    .ff-note {{ font-size: 0.98rem; color: #223455; }}
+    .ff-small {{ font-size: 0.92rem; opacity: 0.9; }}
+    .ff-actorline a {{ color:#1d4ed8; text-decoration:none; font-weight:600; }}
+    .ff-actorline a:hover {{ text-decoration:underline; }}
+    .ff-platforms {{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 10px 0; }}
+    .ff-chip {{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:rgba(255,255,255,0.92); border:1px solid rgba(255,255,255,0.72); box-shadow:0 10px 24px rgba(12,18,31,0.08); }}
+    .ff-chip.mine {{ background: rgba(255,79,95,0.16); border-color: rgba(255,79,95,0.30); color:#8b1220; font-weight:700; }}
+    .ff-result-card {{ background: rgba(255,255,255,0.93); border:1px solid rgba(255,255,255,0.80); border-radius:28px; box-shadow:0 14px 34px rgba(12,18,31,0.12); backdrop-filter: blur(12px); padding:16px; margin-bottom:18px; }}
+    .ff-result-title {{ font-size: 2rem; font-weight:800; color:#17233b; margin:0 0 10px 0; }}
+    .ff-meta {{ color:#31415f; font-size:0.98rem; margin-bottom:8px; }}
+    .ff-stars .bot {{ color:#d1d5db; }}
+    .ff-stars .top {{ color:#fbbf24; position:absolute; overflow:hidden; white-space:nowrap; left:0; top:0; }}
+    .ff-stars {{ position:relative; display:inline-block; letter-spacing:2px; font-size:1rem; line-height:1; margin-right:8px; }}
+    .ff-inline-input .stTextInput, .ff-inline-input .stTextArea {{ margin-bottom:0 !important; }}
+    .ff-inline-input [data-testid='stHorizontalBlock'] {{ align-items:center !important; gap:8px !important; }}
+    .ff-inline-input [data-baseweb='input'], .ff-inline-input textarea {{ background:rgba(255,255,255,0.96)!important; border-radius:18px!important; border:1px solid rgba(255,255,255,0.82)!important; }}
+    .ff-inline-input textarea {{ min-height: 98px !important; }}
+    .ff-clear button {{ height:44px !important; width:44px !important; min-height:44px !important; border-radius:16px !important; padding:0 !important; }}
+    .ff-accent button {{ background:#ff4f5f !important; color:white !important; border:none !important; border-radius:18px !important; box-shadow: 0 12px 28px rgba(255,79,95,0.28) !important; font-weight:700 !important; }}
+    .ff-section-space {{ height:6px; }}
+    .ff-scroll-anchor {{ position:relative; top:-16px; }}
+    .ff-hero-space {{ height: 8px; }}
 
-    .ff-card {{
-        background: rgba(255,255,255,0.96);
-        border: 1px solid rgba(255,255,255,0.84);
-        border-radius: 26px;
-        box-shadow: 0 12px 30px rgba(19, 24, 38, 0.10);
-        padding: 16px 18px;
-        backdrop-filter: blur(14px);
-    }}
-    .ff-availability {{
-        display: inline-block;
-        margin: 10px 0 10px 0;
-        padding: 8px 12px;
-        border-radius: 999px;
-        background: rgba(255,255,255,0.96);
-        border: 1px solid rgba(210,216,226,0.90);
-        font-weight: 600;
-    }}
-    .ff-links {{ margin: 6px 0 10px 0; display:flex; flex-wrap: wrap; gap: 8px; }}
-    .ff-chip-link {{
-        display:inline-block; padding:7px 11px; border-radius:999px;
-        text-decoration:none !important; color:#17365d !important; font-weight:600;
-        background: rgba(255,255,255,0.96); border:1px solid rgba(210,216,226,0.90);
-    }}
-    .ff-chip-link:hover {{ background: {THEME['accent_soft']}; }}
-    .ff-actorline a {{ color:#0b57d0 !important; text-decoration:none !important; font-weight:600; }}
-    .ff-actorline a:hover {{ text-decoration:underline !important; }}
-    .ff-details {{ margin-top: 8px; }}
-    .ff-details summary {{ cursor:pointer; font-weight:700; color:#17233b; }}
-    .ff-stars{{position:relative;display:inline-block;font-size:18px;line-height:1;letter-spacing:1px}}
-    .ff-stars .bot{{color:#d0d0d0;display:block}}
-    .ff-stars .top{{color:#f5c518;position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;display:block}}
+    div[data-testid='stMarkdownContainer'] p {{ color:#17233b; }}
+    .stSelectbox label, .stCheckbox label, .stRadio label {{ color:#17233b !important; font-weight:600; }}
+    .stSelectbox [data-baseweb='select'] > div, .stMultiSelect [data-baseweb='select'] > div {{ border-radius:18px !important; border:1px solid rgba(255,255,255,0.78)!important; background:rgba(255,255,255,0.94)!important; }}
+    .stMultiSelect [data-baseweb='tag'] {{ background:#ff4f5f !important; color:white !important; border-radius:12px !important; }}
 
-    section[data-testid='stSidebar'] > div:first-child {{
-        background: rgba(255,255,255,0.78) !important;
-        backdrop-filter: blur(10px);
-        border-right: 1px solid rgba(255,255,255,0.5);
-    }}
-
-    div[data-testid='stTextInput'] > div > div,
-    div[data-testid='stTextArea'] > div > div,
-    div[data-baseweb='select'],
-    div[data-testid='stMultiSelect'] [data-baseweb='select'] {{
-        background: rgba(255,255,255,0.96) !important;
-        border: 1px solid rgba(214,220,229,0.96) !important;
-        border-radius: 18px !important;
-        box-shadow: 0 8px 18px rgba(20, 24, 35, 0.06) !important;
-    }}
-    div[data-testid='stTextInput'],
-    div[data-testid='stTextArea'] {{
-        max-width: 430px;
-    }}
-    div[data-testid='stTextInput'] input,
-    div[data-testid='stTextArea'] textarea {{
-        color: #17233b !important;
-        font-size: 1rem !important;
-    }}
-    div[data-testid='stTextArea'] textarea {{ min-height: 98px !important; }}
-
-    div[data-testid='stCheckbox'] {{
-        display: inline-block;
-        background: rgba(255,255,255,0.94);
-        border: 1px solid rgba(255,255,255,0.82);
-        border-radius: 18px;
-        box-shadow: 0 10px 22px rgba(19,24,38,0.08);
-        backdrop-filter: blur(10px);
-        padding: 6px 12px 6px 10px;
-        margin-top: 8px;
-    }}
-
-    div[data-testid='stRadio'] > label,
-    div[data-testid='stSelectbox'] label,
-    div[data-testid='stMultiSelect'] label,
-    div[data-testid='stTextInput'] label,
-    div[data-testid='stTextArea'] label {{
-        color: #17233b !important;
-        font-weight: 600 !important;
-    }}
-
-    div[data-testid='stRadio'] [role='radiogroup'] {{
-        display: inline-flex !important;
-        flex-wrap: wrap !important;
-        gap: 16px !important;
-        background: rgba(255,255,255,0.94) !important;
-        border: 1px solid rgba(255,255,255,0.82) !important;
-        border-radius: 22px !important;
-        box-shadow: 0 10px 22px rgba(19,24,38,0.08) !important;
-        backdrop-filter: blur(10px) !important;
-        padding: 10px 14px !important;
-    }}
-
-    .stButton > button, button[kind='secondary'], button[kind='tertiary'] {{
-        border-radius: 16px !important;
-        border: 1px solid rgba(212,218,228,0.96) !important;
-        background: rgba(255,255,255,0.96) !important;
-        color: #17233b !important;
-        min-height: 46px !important;
-        padding: 0 16px !important;
-        box-shadow: 0 10px 22px rgba(19,24,38,0.08) !important;
-        font-weight: 700 !important;
-    }}
-    .stButton > button[kind='primary'] {{
-        background: {THEME['accent']} !important;
-        border-color: {THEME['accent']} !important;
-        color: white !important;
-    }}
-
-    .ff-clear-col button {{
-        min-width: 34px !important;
-        width: 34px !important;
-        height: 34px !important;
-        padding: 0 !important;
-        font-size: 17px !important;
-        border-radius: 12px !important;
-        margin-top: 2px !important;
-    }}
-
-    div[data-testid='stExpander'] {{
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-    }}
-    div[data-testid='stExpander'] details {{
-        background: rgba(255,255,255,0.94) !important;
-        border: 1px solid rgba(255,255,255,0.82) !important;
-        border-radius: 22px !important;
-        box-shadow: 0 10px 22px rgba(19,24,38,0.08) !important;
-        backdrop-filter: blur(10px) !important;
-        overflow: hidden;
-    }}
-    div[data-testid='stExpander'] details summary {{
-        padding-top: 2px !important;
-        padding-bottom: 2px !important;
-    }}
-    div[data-testid='stExpander'] details summary p {{ font-weight: 700 !important; color:#17233b !important; }}
-    .stAlert {{ border-radius: 18px !important; }}
-
-    .ff-preview-note {{
-        background: rgba(255, 245, 204, 0.86);
-        color: #5a4606;
-        border: 1px solid rgba(230, 198, 86, 0.65);
-        border-radius: 16px;
-        padding: 10px 12px;
-        margin: 10px 0 8px 0;
-    }}
-    .ff-result-wrap {{ margin: 12px 0 20px 0; }}
-
-    @media (max-width: 900px) {{
-        .ff-title {{ font-size: 2.5rem; }}
-        .main .block-container {{ padding-left: 12px !important; padding-right: 12px !important; }}
-    }}
-    @media (max-width: 520px) {{
-        .ff-title {{ font-size: 2rem; }}
-        .main .block-container {{ padding-left: 8px !important; padding-right: 8px !important; }}
-        .ff-title-pill {{ padding: 8px 14px; border-radius: 18px; }}
-        .ff-pill {{ padding: 5px 11px; margin: 4px 0 5px 0; }}
-        .ff-inline-note {{ padding: 8px 10px; }}
-        div[data-testid='stHorizontalBlock'] {{
-            flex-wrap: nowrap !important;
-            align-items: flex-start !important;
-            gap: 8px !important;
-        }}
-        div[data-testid='stTextInput'],
-        div[data-testid='stTextArea'] {{
-            max-width: 100% !important;
-            min-width: 0 !important;
-        }}
-        .ff-clear-col button {{
-            min-width: 30px !important;
-            width: 30px !important;
-            height: 30px !important;
-            font-size: 15px !important;
-            border-radius: 10px !important;
-        }}
-        div[data-testid='stTextInput'] input,
-        div[data-testid='stTextArea'] textarea {{
-            font-size: 0.95rem !important;
-        }}
-        div[data-testid='stTextArea'] textarea {{ min-height: 96px !important; }}
-        div[data-testid='stRadio'] [role='radiogroup'] {{
-            gap: 10px !important;
-            padding: 8px 10px !important;
-        }}
+    @media (max-width: 768px) {{
+        .main .block-container {{ padding-left: 16px !important; padding-right: 16px !important; }}
+        .ff-title-pill h1 {{ font-size: 2.05rem; }}
+        .ff-result-title {{ font-size: 1.65rem; }}
+        .ff-title-pill {{ padding: 12px 18px; }}
+        .ff-pill {{ padding: 6px 12px; }}
+        .ff-clear button {{ height:40px !important; width:40px !important; min-height:40px !important; border-radius:14px !important; }}
     }}
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
-apply_theme()
 
-# ================== API ==================
-def sa_get(path: str, params: dict):
-    if not RAPIDAPI_KEY:
-        raise RuntimeError("RAPIDAPI_KEY manquante")
-    r = requests.get(
-        f"{BASE_URL}{path}",
-        headers={"X-RapidAPI-Key": RAPIDAPI_KEY, "X-RapidAPI-Host": RAPIDAPI_HOST},
-        params=params,
-        timeout=25,
-    )
-    if not r.ok:
-        raise RuntimeError(f"API ERROR {r.status_code}: {r.text[:300]}")
+def stars_html(score_10):
+    if score_10 is None:
+        return ""
+    try:
+        pct = max(0.0, min(100.0, float(score_10) * 10))
+        score_txt = f"{float(score_10):.1f}/10"
+    except Exception:
+        return ""
+    return f"<span class='ff-stars'><span class='top' style='width:{pct}%' >★★★★★</span><span class='bot'>★★★★★</span></span> <span class='ff-small'>({escape(score_txt)})</span>"
+
+
+def tmdb_headers():
+    headers = {"accept": "application/json"}
+    if TMDB_BEARER_TOKEN:
+        headers["Authorization"] = f"Bearer {TMDB_BEARER_TOKEN}"
+    return headers
+
+
+def tmdb_get(path: str, params=None):
+    if not TMDB_API_KEY and not TMDB_BEARER_TOKEN:
+        raise RuntimeError("TMDb non configuré")
+    params = dict(params or {})
+    if TMDB_API_KEY and not TMDB_BEARER_TOKEN:
+        params["api_key"] = TMDB_API_KEY
+    r = requests.get(f"{TMDB_BASE}{path}", headers=tmdb_headers(), params=params, timeout=18)
+    if r.status_code >= 400:
+        raise RuntimeError(f"TMDb {r.status_code}: {r.text[:250]}")
     return r.json()
 
-def api_is_quota_error(msg: str) -> bool:
-    t = norm_text(msg)
-    return "429" in t or "quota" in t or "monthly quota" in t or "too many requests" in t
 
-@st.cache_data(show_spinner=False, ttl=86400)
-def omdb_fetch(imdb_id: str):
-    if not OMDB_API_KEY or not imdb_id:
-        return None
+@st.cache_data(show_spinner=False, ttl=3600)
+def get_movie_genres(lang: str):
     try:
-        r = requests.get(
-            "https://www.omdbapi.com/",
-            params={"i": imdb_id, "apikey": OMDB_API_KEY, "tomatoes": "true"},
-            timeout=20,
-        )
-        if not r.ok:
-            return None
-        data = r.json()
-        if data.get("Response") == "True":
-            return data
+        data = tmdb_get("/genre/movie/list", {"language": lang})
+        return {g["id"]: g["name"] for g in data.get("genres", [])}
     except Exception:
+        return GENRES_MOVIE.copy()
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def get_tv_genres(lang: str):
+    try:
+        data = tmdb_get("/genre/tv/list", {"language": lang})
+        return {g["id"]: g["name"] for g in data.get("genres", [])}
+    except Exception:
+        return GENRES_TV.copy()
+
+
+def extract_keywords(text: str, max_words: int = 8):
+    words = re.findall(r"[a-zA-ZÀ-ÿ0-9']+", text.lower())
+    words = [w for w in words if len(w) >= 4 and w not in STOPWORDS]
+    out = []
+    for w in words:
+        if w not in out:
+            out.append(w)
+        if len(out) >= max_words:
+            break
+    return " ".join(out)
+
+
+def heuristic_titles(query: str):
+    q = norm_text(query)
+    out = []
+    if any(x in q for x in ["boucle", "revit", "revivre", "meme journee", "même journée", "rena", "ressusc", "time loop"]):
+        out += ["Edge of Tomorrow", "Palm Springs", "Un jour sans fin", "Happy Death Day"]
+    if "tom cruise" in q:
+        out.insert(0, "Edge of Tomorrow")
+    if any(x in q for x in ["extraterrestre", "alien"]) and any(x in q for x in ["boucle", "revit", "journee", "journée", "rena"]):
+        out.insert(0, "Edge of Tomorrow")
+    uniq = []
+    for t in out:
+        if t not in uniq:
+            uniq.append(t)
+    return uniq
+
+
+def normalize_provider_name(name: str):
+    t = norm_text(name).replace(".", " ").replace("+", " + ")
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def provider_matches_selected(provider: dict, selected_ids):
+    provider_id = provider.get("provider_id")
+    provider_name = normalize_provider_name(provider.get("provider_name", ""))
+    for sid in selected_ids:
+        meta = SERVICE_BY_ID.get(sid)
+        if not meta:
+            continue
+        if provider_id in meta.get("tmdb", []):
+            return True
+        aliases = [normalize_provider_name(a) for a in meta.get("aliases", [])] + [normalize_provider_name(meta.get("name", sid))]
+        if any(a and (a in provider_name or provider_name in a) for a in aliases):
+            return True
+    return False
+
+
+@st.cache_data(show_spinner=False, ttl=1800)
+def fetch_details(media_type: str, tmdb_id: int, lang: str, country: str):
+    detail = tmdb_get(f"/{media_type}/{tmdb_id}", {"language": lang})
+    try:
+        providers_raw = tmdb_get(f"/{media_type}/{tmdb_id}/watch/providers")
+        providers = (((providers_raw or {}).get("results") or {}).get(country) or {})
+    except Exception:
+        providers = {}
+    return {"detail": detail, "providers": providers}
+
+
+def build_item(hit: dict, lang: str, country: str, selected_ids):
+    media_type = hit.get("media_type")
+    if media_type not in {"movie", "tv"}:
         return None
-    return None
-
-def critic_score_and_sources(show: dict):
-    api_rating = show.get("rating", None)
-    api_score = float(api_rating) if isinstance(api_rating, (int, float)) else None
-
-    imdb_id = show.get("imdbId") or show.get("imdbID") or None
-    data = omdb_fetch(imdb_id) if imdb_id else None
-
-    rt = None
-    meta = None
-    imdb = None
-    if data:
+    tmdb_id = hit.get("id")
+    enriched = fetch_details(media_type, tmdb_id, lang, country)
+    detail = enriched["detail"]
+    providers = enriched["providers"]
+    title = detail.get("title") or detail.get("name") or hit.get("title") or hit.get("name") or "Sans titre"
+    year = (detail.get("release_date") or detail.get("first_air_date") or "")[:4]
+    genres_map = get_movie_genres(lang) if media_type == "movie" else get_tv_genres(lang)
+    genre_names = [genres_map.get(gid, "") for gid in detail.get("genre_ids", []) or []]
+    if not genre_names:
+        genre_names = [g.get("name", "") for g in detail.get("genres", [])]
+    cast = [c.get("name", "") for c in (detail.get("credits", {}) or {}).get("cast", [])[:8]] if detail.get("credits") else []
+    if not cast:
         try:
-            if data.get("imdbRating") and data.get("imdbRating") != "N/A":
-                imdb = float(data["imdbRating"])
+            credits = tmdb_get(f"/{media_type}/{tmdb_id}/credits", {"language": lang})
+            cast = [c.get("name", "") for c in credits.get("cast", [])[:8]]
         except Exception:
-            pass
-        try:
-            if data.get("Metascore") and data.get("Metascore") != "N/A":
-                meta = int(data["Metascore"])
-        except Exception:
-            pass
-        try:
-            for r in data.get("Ratings", []) or []:
-                if r.get("Source") == "Rotten Tomatoes":
-                    v = r.get("Value", "")
-                    if v.endswith("%"):
-                        rt = int(v.replace("%", "").strip())
-        except Exception:
-            pass
-
-    parts = []
-    if imdb is not None:
-        parts.append(f"IMDb {imdb:.1f}/10")
-    if meta is not None:
-        parts.append(f"Meta {meta}/100")
-    if rt is not None:
-        parts.append(f"RT {rt}%")
-    if not parts and api_score is not None:
-        parts.append(f"Score {int(api_score)}/100")
-
-    if rt is not None:
-        score = float(rt)
-    elif meta is not None:
-        score = float(meta)
-    elif imdb is not None:
-        score = float(imdb * 10.0)
-    elif api_score is not None:
-        score = float(api_score)
+            cast = []
+    provider_list = []
+    for key in ["flatrate", "ads", "free", "rent", "buy"]:
+        for p in providers.get(key, []) or []:
+            if not any(x.get("provider_id") == p.get("provider_id") for x in provider_list):
+                provider_list.append(p)
+    mine = any(provider_matches_selected(p, selected_ids) for p in provider_list)
+    country_txt = ""
+    if media_type == "movie":
+        pcs = detail.get("production_countries") or []
+        if pcs:
+            country_txt = pcs[0].get("name", "")
     else:
-        score = None
-
-    return score, (" · ".join(parts) if parts else "")
-
-def actors_list_from_omdb(show: dict):
-    imdb_id = show.get("imdbId") or show.get("imdbID") or None
-    data = omdb_fetch(imdb_id) if imdb_id else None
-    if not data:
-        return []
-    a = data.get("Actors")
-    if isinstance(a, str) and a.strip() and a.strip().upper() != "N/A":
-        return [x.strip() for x in a.split(",") if x.strip()]
-    return []
-
-def country_from_omdb(show: dict):
-    imdb_id = show.get("imdbId") or show.get("imdbID") or None
-    data = omdb_fetch(imdb_id) if imdb_id else None
-    if not data:
-        return ""
-    c = data.get("Country")
-    if isinstance(c, str) and c.strip() and c.strip().upper() != "N/A":
-        return c.strip()
-    return ""
-
-def search_by_title(title: str, country: str, show_type: str, lang: str):
-    data = sa_get("/shows/search/title", {
+        oc = detail.get("origin_country") or []
+        if oc:
+            country_txt = oc[0]
+    imdb_id = detail.get("imdb_id")
+    external_link = f"https://www.themoviedb.org/{'movie' if media_type=='movie' else 'tv'}/{tmdb_id}"
+    if imdb_id:
+        external_link = f"https://www.imdb.com/title/{imdb_id}/"
+    return {
+        "id": f"{media_type}:{tmdb_id}",
+        "media_type": media_type,
+        "tmdb_id": tmdb_id,
         "title": title,
-        "country": country,
-        "show_type": show_type,
-        "series_granularity": "show",
-        "output_language": lang,
-    })
-    return data if isinstance(data, list) else []
-
-def search_by_keyword(keyword: str, country: str, show_type: str, lang: str):
-    res = sa_get("/shows/search/filters", {
-        "country": country,
-        "show_type": show_type,
-        "keyword": keyword,
-        "series_granularity": "show",
-        "output_language": lang,
-    })
-    return res.get("shows", []) if isinstance(res, dict) else []
-
-# ================== OPTIONAL OLLAMA ==================
-def ollama_is_up() -> bool:
-    try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=2)
-        return r.ok
-    except Exception:
-        return False
-
-def ollama_pack(description: str):
-    prompt = f"""
-Réponds UNIQUEMENT avec un JSON valide:
-{{"titles":[...], "queries":[...]}}
-
-Règles:
-- Si tu reconnais le titre exact, mets-le en PREMIER dans titles.
-- titles: 3 à 7 titres max.
-- queries: 4 à 7 requêtes max, courtes.
-- pas de phrases longues.
-
-Souvenir: {description}
-""".strip()
-    r = requests.post(
-        f"{OLLAMA_URL}/api/generate",
-        json={
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0.2, "num_predict": 260}
-        },
-        timeout=45,
-    )
-    if not r.ok:
-        raise RuntimeError(f"Ollama ERROR {r.status_code}: {r.text[:300]}")
-    txt = (r.json().get("response", "") or "").strip()
-    try:
-        return json.loads(txt)
-    except Exception:
-        start = txt.find("{")
-        end = txt.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            return {"titles": [], "queries": []}
-        try:
-            return json.loads(txt[start:end + 1])
-        except Exception:
-            return {"titles": [], "queries": []}
-
-# ================== PREVIEW FALLBACK ==================
-def build_mock_result(query: str, selected_ids, actor_name: str = ""):
-    qn = norm_text(query)
-    likely_edge = any(x in qn for x in ["extraterrestre", "alien", "boucle", "rena", "ressusc", "revit", "tom cruise", "edge of tomorrow", "live die repeat"]) or bool(actor_name)
-    if actor_name:
-        title = f"Films probables avec {actor_name}"
-        overview = f"Aperçu visuel généré automatiquement pour la recherche acteur “{actor_name}”."
-        actors = [actor_name, "Tom Cruise", "Emily Blunt"]
-        links = [
-            {"service": {"name": "Prime Video", "id": "prime"}, "type": "subscription", "link": "#"},
-            {"service": {"name": "HBO Max", "id": "max"}, "type": "subscription", "link": "#"},
-        ]
-        year = 2014
-        country = "United States"
-    elif likely_edge:
-        title = "Edge of Tomorrow"
-        overview = "Dans un futur proche, un soldat meurt puis revit encore et encore la même journée au cœur d'une guerre contre des extraterrestres."
-        actors = ["Tom Cruise", "Emily Blunt", "Bill Paxton"]
-        links = [
-            {"service": {"name": "Prime Video", "id": "prime"}, "type": "subscription", "link": "#"},
-            {"service": {"name": "HBO Max", "id": "max"}, "type": "subscription", "link": "#"},
-        ]
-        year = 2014
-        country = "United States"
-    else:
-        title = "Titre probable"
-        overview = f"Aperçu visuel généré parce que l'API ne répond pas pour la requête “{query}”."
-        actors = ["Acteur 1", "Actrice 2", "Acteur 3"]
-        links = [{"service": {"name": "Netflix", "id": "netflix"}, "type": "subscription", "link": "#"}]
-        year = 2020
-        country = "France"
-
-    return [{
-        "show": {
-            "title": title,
-            "overview": overview,
-            "releaseYear": year,
-            "firstAirYear": year,
-            "streamingOptions": {"fr": links, "be": links, "ch": links, "gb": links, "us": links},
-            "imageSet": {},
-            "imdbId": "",
-            "id": f"preview_{title}",
-            "previewActors": actors,
-            "previewCountry": country,
-        },
-        "rel": 99.0,
         "year": year,
-        "score100": 90.0 if likely_edge else 78.0,
-        "sources": "Mode aperçu visuel",
-        "is_mine": 1 if any(option_on_my_services(o, selected_ids) for o in links) else 0,
-    }]
+        "overview": detail.get("overview") or hit.get("overview") or "",
+        "vote": detail.get("vote_average"),
+        "poster": f"{TMDB_IMG}/w342{detail.get('poster_path')}" if detail.get("poster_path") else "",
+        "backdrop": f"{TMDB_IMG}/w780{detail.get('backdrop_path')}" if detail.get("backdrop_path") else "",
+        "genres": [g for g in genre_names if g],
+        "cast": [c for c in cast if c],
+        "providers": provider_list,
+        "is_mine": mine,
+        "country": country_txt,
+        "link": external_link,
+    }
 
-# ================== RENDER ==================
-def actor_links_html(actors):
-    pieces = []
-    for actor in actors:
-        label = escape(actor)
-        href = f"?actor={quote(actor)}"
-        pieces.append(f'<a href="{href}" target="_self">{label}</a>')
-    return ", ".join(pieces)
 
-def platform_links_html(options):
-    links = []
-    for o in options[:5]:
-        service = o.get("service") or {}
-        name = escape(str(service.get("name") or service.get("id") or "Service"))
-        typ = escape(str(o.get("type") or ""))
-        link = o.get("link") or o.get("videoLink") or "#"
-        links.append(f'<a class="ff-chip-link" href="{escape(link)}" target="_blank">{name}{(" · " + typ) if typ else ""}</a>')
-    return "".join(links)
+def relevance_score(item: dict, query: str):
+    q = norm_text(query)
+    hay = norm_text(" ".join([
+        item.get("title", ""),
+        item.get("overview", ""),
+        " ".join(item.get("genres", [])),
+        " ".join(item.get("cast", [])),
+    ]))
+    words = [w for w in q.split() if len(w) >= 4 and w not in STOPWORDS]
+    score = 0.0
+    for w in set(words):
+        if w in hay:
+            score += 1.0
+    if any(x in q for x in ["boucle", "revit", "rena", "ressusc", "time loop"]):
+        if any(x in hay for x in ["loop", "day", "repeat", "boucle", "tempore"]):
+            score += 2.0
+    if "edge of tomorrow" in norm_text(item.get("title", "")) and any(x in q for x in ["tom cruise", "alien", "extraterrestre", "boucle", "rena"]):
+        score += 3.0
+    if item.get("is_mine"):
+        score += 0.4
+    return score
 
-def render_result(item, profile, actor_mode=False):
-    show = item["show"]
-    title = show.get("title", "Sans titre")
-    year = item.get("year") or parse_year_value(show)
-    poster = get_poster_url(show)
-    score100 = item.get("score100")
-    sources = item.get("sources") or ""
-    overview = show.get("overview") or ""
 
-    country = profile.get("country", "fr")
-    selected_ids = set(profile.get("platform_ids", []))
-    show_elsewhere = bool(profile.get("show_elsewhere", False))
+def search_tmdb_free(main_query: str, more: str, show_type: str, lang: str, country: str, selected_ids, mode: str):
+    if not TMDB_API_KEY and not TMDB_BEARER_TOKEN:
+        raise RuntimeError("Ajoute TMDB_API_KEY ou TMDB_BEARER_TOKEN dans les Secrets Streamlit pour activer la recherche réelle.")
 
-    opts_all = ((show.get("streamingOptions") or {}).get(country) or [])
-    opts_all = dedupe_streaming_options(opts_all)
-    opts_mine = [o for o in opts_all if option_on_my_services(o, selected_ids)]
-    opts_mine = dedupe_streaming_options(opts_mine)
-
-    actors = actors_list_from_omdb(show)
-    if not actors:
-        actors = show.get("previewActors") or []
-
-    country_text = country_from_omdb(show) if OMDB_API_KEY else ""
-    if not country_text:
-        country_text = show.get("previewCountry") or ""
-    iso = iso2_from_country_text(country_text) if country_text else ""
-    flag = flag_from_iso2(iso) if iso else ""
-    country_label = country_text.split(",")[0].strip() if country_text else ""
-
-    availability = "✅ Dispo sur tes applis" if opts_mine else "❌ Pas dispo sur tes applis"
-    availability_class = "ff-availability"
-    links_html = ""
-    if opts_mine:
-        links_html = f'<div class="ff-links">{platform_links_html(opts_mine)}</div>'
-    elif show_elsewhere and opts_all:
-        links_html = f'<div class="ff-links">{platform_links_html(opts_all)}</div>'
-
-    star = stars_html(score100)
-    score5 = ""
-    if score100 is not None:
-        score5 = f'<span class="ff-muted" style="margin-left:8px">({round(float(score100)/20.0, 1)}/5)</span>'
-    flag_html = f'<span class="ff-muted" style="margin-left:10px">{flag} {escape(country_label)}</span>' if (flag or country_label) else ""
-    meta_line = f'{star}{score5}{flag_html}' if star else (flag_html if flag_html else "")
-
-    actors_html = ""
-    if actors:
-        actors_html = f'<div class="ff-actorline ff-muted" style="margin-top:10px">Acteurs : {actor_links_html(actors[:8])}</div>'
-
-    details_parts = []
-    if sources:
-        details_parts.append(f'<div class="ff-muted" style="margin-top:8px">{escape(sources)}</div>')
-    if overview:
-        details_parts.append(f'<div style="margin-top:8px; line-height:1.7">{escape(overview)}</div>')
-    if actors_html:
-        details_parts.append(actors_html)
-    details_block = ""
-    if details_parts:
-        details_block = '<details class="ff-details"><summary>Détails</summary>' + "".join(details_parts) + '</details>'
-
-    card_html = f"""
-    <div class="ff-card">
-        <h3 style="margin:0 0 8px 0; font-size:2rem; line-height:1.15;">{escape(title)}{f' ({year})' if year else ''}</h3>
-        <div>{meta_line}</div>
-        <div class="{availability_class}">{availability}</div>
-        {links_html}
-        {details_block}
-    </div>
-    """
-
-    st.markdown("<div class='ff-result-wrap'>", unsafe_allow_html=True)
-    if poster:
-        c1, c2 = st.columns([1, 4])
-        with c1:
-            st.image(poster, width=140)
-        with c2:
-            st.markdown(card_html, unsafe_allow_html=True)
+    search_paths = []
+    if show_type == "movie":
+        search_paths = ["movie"]
+    elif show_type == "tv":
+        search_paths = ["tv"]
     else:
-        st.markdown(card_html, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+        search_paths = ["movie", "tv"]
+
+    query_full = " ".join(x for x in [main_query.strip(), more.strip()] if x.strip()).strip()
+    queries = [main_query.strip()]
+    if mode in {"Normal", "Profond"}:
+        kw = extract_keywords(query_full)
+        if kw and kw not in queries:
+            queries.append(kw)
+    if mode == "Profond":
+        for t in heuristic_titles(query_full):
+            if t not in queries:
+                queries.append(t)
+
+    hits = {}
+    page_limit = 1 if mode == "Rapide" else 2 if mode == "Normal" else 3
+    for q in queries[: 1 if mode == "Rapide" else 3]:
+        for path in search_paths:
+            for page in range(1, page_limit + 1):
+                try:
+                    data = tmdb_get(f"/search/{path}", {"query": q, "language": lang, "page": page, "include_adult": False})
+                except Exception:
+                    continue
+                for r in data.get("results", []):
+                    r["media_type"] = "movie" if path == "movie" else "tv"
+                    hits[(r["media_type"], r["id"])] = r
+
+    items = []
+    for r in list(hits.values())[: (10 if mode == "Rapide" else 20 if mode == "Normal" else 28)]:
+        try:
+            item = build_item(r, lang, country, selected_ids)
+            if item:
+                item["score"] = relevance_score(item, query_full)
+                items.append(item)
+        except Exception:
+            continue
+    return items
+
+
+def search_actor_movies(actor_name: str, show_type: str, lang: str, country: str, selected_ids):
+    if not actor_name.strip():
+        return []
+    data = tmdb_get("/search/person", {"query": actor_name, "language": lang, "include_adult": False})
+    people = data.get("results", [])
+    if not people:
+        return []
+    person = people[0]
+    credits = tmdb_get(f"/person/{person['id']}/combined_credits", {"language": lang})
+    all_credits = credits.get("cast", [])
+    wanted = []
+    wanted_type = "movie" if show_type == "movie" else "tv" if show_type == "tv" else None
+    for c in all_credits:
+        if c.get("media_type") not in {"movie", "tv"}:
+            continue
+        if wanted_type and c.get("media_type") != wanted_type:
+            continue
+        wanted.append(c)
+    wanted.sort(key=lambda x: (x.get("vote_count", 0), x.get("popularity", 0)), reverse=True)
+    items = []
+    seen = set()
+    for c in wanted[:24]:
+        key = (c.get("media_type"), c.get("id"))
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            item = build_item(c, lang, country, selected_ids)
+            if item:
+                item["score"] = (item.get("vote") or 0) + (0.4 if item.get("is_mine") else 0)
+                items.append(item)
+        except Exception:
+            continue
+    return items
+
+
+def apply_filters_and_sort(items, selected_genres, selected_years, mine_only, sort_mode):
+    out = []
+    sel_genres = set(selected_genres or [])
+    sel_years = set(selected_years or [])
+    for it in items:
+        if mine_only and not it.get("is_mine"):
+            continue
+        if sel_genres and not (set(it.get("genres", [])) & sel_genres):
+            continue
+        if sel_years and (it.get("year") not in sel_years):
+            continue
+        out.append(it)
+
+    if sort_mode == "Note (haute)":
+        out.sort(key=lambda x: (x.get("vote") or 0, x.get("is_mine"), x.get("year") or ""), reverse=True)
+    elif sort_mode == "Année (récente)":
+        out.sort(key=lambda x: (x.get("year") or "", x.get("is_mine"), x.get("vote") or 0), reverse=True)
+    else:
+        out.sort(key=lambda x: (x.get("score") or 0, x.get("is_mine"), x.get("vote") or 0), reverse=True)
+    return out
+
+
+def render_result(item: dict):
+    c1, c2 = st.columns([1.0, 2.6], vertical_alignment="top")
+    with c1:
+        if item.get("poster"):
+            st.image(item["poster"], use_container_width=True)
+    with c2:
+        st.markdown(f"<div class='ff-result-title'>{escape(item['title'])}{' (' + escape(item['year']) + ')' if item.get('year') else ''}</div>", unsafe_allow_html=True)
+        meta_bits = []
+        if item.get("vote"):
+            meta_bits.append(stars_html(item.get("vote")))
+        if item.get("country"):
+            meta_bits.append(f"<span class='ff-small'>{escape(item['country'])}</span>")
+        if item.get("media_type"):
+            meta_bits.append(f"<span class='ff-small'>{'Film' if item['media_type']=='movie' else 'Série'}</span>")
+        if meta_bits:
+            st.markdown("<div class='ff-meta'>" + " &nbsp; ".join(meta_bits) + "</div>", unsafe_allow_html=True)
+
+        providers = item.get("providers", [])
+        if providers:
+            chips = []
+            for p in providers:
+                cls = "ff-chip mine" if item.get("is_mine") and provider_matches_selected(p, profile.get("platform_ids", [])) else "ff-chip"
+                chips.append(f"<span class='{cls}'>{escape(p.get('provider_name',''))}</span>")
+            st.markdown("<div class='ff-platforms'>" + "".join(chips[:8]) + "</div>", unsafe_allow_html=True)
+        else:
+            txt = "✅ Dispo sur tes applis" if item.get("is_mine") else "❌ Pas de plateforme détectée"
+            st.markdown(f"<div class='ff-bubble ff-note'>{txt}</div>", unsafe_allow_html=True)
+
+        with st.expander("Détails"):
+            if item.get("overview"):
+                st.write(item["overview"])
+            if item.get("genres"):
+                st.caption("Genres : " + ", ".join(item["genres"]))
+            if item.get("cast"):
+                links = []
+                for actor in item["cast"][:6]:
+                    links.append(f"<a href='?actor={quote_plus(actor)}#results'>{escape(actor)}</a>")
+                st.markdown("<div class='ff-actorline'>Acteurs : " + ", ".join(links) + "</div>", unsafe_allow_html=True)
+            st.markdown(f"[Ouvrir la fiche]({item['link']})")
+
 
 def scroll_to_results():
     st.markdown(
         """
         <script>
-        (function() {
-            const go = () => {
-                const anchor = window.parent.document.getElementById('ff-results-anchor') || document.getElementById('ff-results-anchor');
-                if (anchor) {
-                    anchor.scrollIntoView({behavior: 'smooth', block: 'start'});
-                }
-                const active = window.parent.document.activeElement || document.activeElement;
-                if (active && typeof active.blur === 'function') active.blur();
-            };
-            setTimeout(go, 120);
-            setTimeout(go, 420);
-        })();
+        setTimeout(function(){
+          const a = window.parent.document.getElementById('results-anchor');
+          if(a){ a.scrollIntoView({behavior:'smooth', block:'start'}); }
+          const active = window.parent.document.activeElement;
+          if(active && typeof active.blur === 'function'){ active.blur(); }
+        }, 180);
         </script>
         """,
         unsafe_allow_html=True,
     )
 
-# ================== QUERY PARAMS / SIDEBAR ==================
-qp_actor = st.query_params.get("actor", "")
-if isinstance(qp_actor, list):
-    qp_actor = qp_actor[0] if qp_actor else ""
-if qp_actor and qp_actor != st.session_state.get("last_query", ""):
-    st.session_state["actor_search"] = str(qp_actor)
-    st.session_state["do_search"] = True
-    st.session_state["sort_mode"] = "Note (haute)"
-else:
-    st.session_state.setdefault("actor_search", "")
 
-with st.sidebar:
-    st.markdown(f"### FilmFinder IA")
-    st.caption(THEME["name"])
-    if st.session_state["entered"]:
-        st.radio("Menu", ["Recherche", "Profil"], key="page")
-    else:
-        st.caption("Accueil")
+def clear_q_main():
+    st.session_state["q_main"] = ""
 
-    bg_source = st.session_state.get("bg_source", "")
-    bg_movie = st.session_state.get("bg_movie_title", "")
-    bg_event = st.session_state.get("bg_event_label", "")
-    if bg_source:
-        st.caption(f"Fond : {bg_source}")
-    if bg_event:
-        st.caption(bg_event)
-    if bg_movie:
-        st.caption(f"Référence : {bg_movie}")
-    if (not tmdb_has_auth()) and st.session_state.get("bg_count", 0) == 0:
-        st.caption("Ajoute TMDB_API_KEY ou TMDB_BEARER_TOKEN dans les secrets Streamlit pour un fond cinéma du jour.")
-    if st.button("Changer le fond"):
-        st.session_state["bg_image_name"] = ""
-        st.session_state["bg_refresh_nonce"] = int(st.session_state.get("bg_refresh_nonce", 0)) + 1
-        st.rerun()
-    if tmdb_has_auth():
-        st.caption("This product uses the TMDb API but is not endorsed or certified by TMDb.")
 
-# ================== HOME ==================
-if st.session_state["page"] == "Accueil":
-    st.markdown("<div class='ff-title-pill'><h1 class='ff-title'>FilmFinder IA</h1></div>", unsafe_allow_html=True)
-    st.markdown("<div class='ff-subtitle'>Souvenir flou → titres probables → où regarder.</div>", unsafe_allow_html=True)
-    if tmdb_has_auth():
-        st.caption("Fond du jour : référence cinéma récupérée automatiquement via TMDb/Wikidata.")
+def clear_q_more():
+    st.session_state["q_more"] = ""
 
-    with st.form("signup_form"):
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            country = st.selectbox("Pays", ["fr", "be", "ch", "gb", "us"], index=["fr","be","ch","gb","us"].index(profile.get("country","fr")))
-        with c2:
-            lang = st.selectbox("Langue", ["fr", "en"], index=["fr","en"].index(profile.get("lang","fr")))
-        with c3:
-            typ = st.selectbox("Type", ["Film", "Série"], index=0 if profile.get("show_type","movie") == "movie" else 1)
-        with c4:
-            show_elsewhere = st.checkbox("Ailleurs", value=bool(profile.get("show_elsewhere", False)))
 
-        default_names = [SERVICE_BY_ID[sid]["name"] for sid in profile.get("platform_ids", []) if sid in SERVICE_BY_ID]
-        chosen_names = st.multiselect("Tes plateformes", options=SERVICE_NAMES, default=default_names)
-        platform_ids = [NAME_TO_ID[name] for name in chosen_names]
-
-        enter_btn = st.form_submit_button("Entrer", type="primary")
-
-    if enter_btn:
-        if not platform_ids:
-            st.warning("Coche au moins 1 plateforme 🙂")
-        else:
-            new_profile = {
-                "country": country,
-                "lang": lang,
-                "show_type": "movie" if typ == "Film" else "series",
-                "platform_ids": platform_ids,
-                "show_elsewhere": bool(show_elsewhere),
-            }
-            save_profile(new_profile)
-            st.session_state["entered"] = True
-            st.session_state["page"] = "Recherche"
-            st.rerun()
-    st.stop()
-
-# ================== PROFILE ==================
-if st.session_state["page"] == "Profil":
-    st.markdown("<div class='ff-title-pill'><h1 class='ff-title' style='font-size:2.4rem'>Profil</h1></div>", unsafe_allow_html=True)
-    with st.form("profile_form"):
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            country = st.selectbox("Pays", ["fr", "be", "ch", "gb", "us"], index=["fr","be","ch","gb","us"].index(profile.get("country","fr")))
-        with c2:
-            lang = st.selectbox("Langue", ["fr", "en"], index=["fr","en"].index(profile.get("lang","fr")))
-        with c3:
-            typ = st.selectbox("Type", ["Film", "Série"], index=0 if profile.get("show_type","movie") == "movie" else 1)
-        with c4:
-            show_elsewhere = st.checkbox("Ailleurs", value=bool(profile.get("show_elsewhere", False)))
-        default_names = [SERVICE_BY_ID[sid]["name"] for sid in profile.get("platform_ids", []) if sid in SERVICE_BY_ID]
-        chosen_names = st.multiselect("Tes plateformes", options=SERVICE_NAMES, default=default_names)
-        platform_ids = [NAME_TO_ID[name] for name in chosen_names]
-        ok_btn = st.form_submit_button("Enregistrer", type="primary")
-
-    if ok_btn:
-        if not platform_ids:
-            st.warning("Coche au moins 1 plateforme 🙂")
-        else:
-            new_profile = {
-                "country": country,
-                "lang": lang,
-                "show_type": "movie" if typ == "Film" else "series",
-                "platform_ids": platform_ids,
-                "show_elsewhere": bool(show_elsewhere),
-            }
-            save_profile(new_profile)
-            st.success("Profil enregistré.")
-            st.rerun()
-    st.stop()
-
-# ================== SEARCH ==================
-profile = load_profile()
-
-if not profile.get("platform_ids"):
-    st.warning("Crée ton profil avant de chercher.")
-    st.stop()
-
-MODE_PRESETS = {
-    "Rapide":  {"titles_max": 2, "queries_max": 2, "en_if_under": 6,  "pool": 40,  "omdb_top": 12},
-    "Normal":  {"titles_max": 4, "queries_max": 4, "en_if_under": 8,  "pool": 70,  "omdb_top": 18},
-    "Profond": {"titles_max": 7, "queries_max": 7, "en_if_under": 999, "pool": 120, "omdb_top": 25},
-}
-
-def trigger_search():
-    st.session_state["do_search"] = True
-
-def clear_input(key: str):
-    st.session_state[key] = ""
-
-q_main_default = "" if st.session_state.get("actor_search") else st.session_state.get("last_typed_main", "")
-q_more_default = st.session_state.get("last_typed_more", "")
-st.session_state.setdefault("q_main", q_main_default)
-st.session_state.setdefault("q_more", q_more_default)
-
-st.markdown("<div class='ff-title-pill'><h1 class='ff-title' style='font-size:2.35rem;'>Recherche</h1></div>", unsafe_allow_html=True)
-
-st.markdown("<div class='ff-pill'>Mode</div>", unsafe_allow_html=True)
-mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1, label_visibility="collapsed")
-preset = MODE_PRESETS[mode]
-
-if st.session_state.get("actor_search"):
-    actor = st.session_state["actor_search"]
-    st.markdown(f"<div class='ff-inline-note'>Recherche acteur : <b>{escape(actor)}</b> — recherche automatique des films de cet acteur.</div>", unsafe_allow_html=True)
-    if st.button("Retour recherche normale"):
-        st.session_state["actor_search"] = ""
-        st.session_state["last_results"] = None
-        st.session_state["api_preview_notice"] = ""
-        st.session_state["api_error_notice"] = ""
-        try:
-            st.query_params.clear()
-        except Exception:
-            pass
-        st.rerun()
-
-st.markdown("<div class='ff-pill'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
-col1, col2 = st.columns([11.2, 1], gap="small")
-with col1:
-    q_main = st.text_input(
-        "Ton souvenir (Entrée lance)",
-        key="q_main",
-        label_visibility="collapsed",
-        on_change=trigger_search,
-        placeholder="Ex: homme extraterrestre renaît",
-    )
-with col2:
-    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    st.button("✕", key="clear_q_main", help="Vider le souvenir", on_click=clear_input, args=("q_main",))
-    st.markdown("</div>", unsafe_allow_html=True)
-
-st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
-if st.button("Trouver", type="primary"):
-    st.session_state["do_search"] = True
-
-st.markdown("<div class='ff-pill'>Détails (optionnel)</div>", unsafe_allow_html=True)
-col3, col4 = st.columns([11.2, 1], gap="small")
-with col3:
-    q_more = st.text_area(
-        "Détails (optionnel)",
-        key="q_more",
-        label_visibility="collapsed",
-        placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…",
-    )
-with col4:
-    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    st.button("✕", key="clear_q_more", help="Vider les détails", on_click=clear_input, args=("q_more",))
-    st.markdown("</div>", unsafe_allow_html=True)
-
-with st.expander("Filtres", expanded=False):
-    left, right = st.columns(2)
-    selected_genres = []
-    selected_years = []
-    with left:
-        st.caption("Genres")
-        for g in GENRES:
-            if st.checkbox(g, key=f"genre_{g}"):
-                selected_genres.append(g)
-    with right:
-        st.caption("Années")
-        for y in YEARS:
-            if st.checkbox(y, key=f"year_{y}"):
-                selected_years.append(int(y))
-
-st.markdown("<div class='ff-pill'>Trier par</div>", unsafe_allow_html=True)
-sort_mode = st.selectbox(
-    "Trier par",
-    ["Pertinence", "Année (récent)", "Note (haute)"],
-    index=["Pertinence", "Année (récent)", "Note (haute)"].index(st.session_state.get("sort_mode", "Pertinence")),
-    label_visibility="collapsed",
-)
-st.session_state["sort_mode"] = sort_mode
-
-only_my_apps = st.checkbox("Uniquement sur mes applis", value=False)
-
-# ================== SEARCH ACTION ==================
-if st.session_state["do_search"]:
-    st.session_state["do_search"] = False
-    st.session_state["api_preview_notice"] = ""
-    st.session_state["api_error_notice"] = ""
-
-    country = profile["country"]
-    lang = profile["lang"]
-    show_type = profile["show_type"]
-
-    if st.session_state.get("actor_search"):
-        show_type = "movie"
-        q = st.session_state["actor_search"].strip()
-    else:
-        q = ((st.session_state.get("q_main", "").strip()) + " " + (st.session_state.get("q_more", "").strip())).strip()
-        st.session_state["last_typed_main"] = st.session_state.get("q_main", "")
-        st.session_state["last_typed_more"] = st.session_state.get("q_more", "")
-
-    if not q:
-        st.warning("Écris au moins une phrase 🙂")
-        st.stop()
-
-    titles = heuristic_titles_from_query(q)
-    queries = []
-    if ollama_is_up() and not st.session_state.get("actor_search"):
-        try:
-            pack = ollama_pack(q)
-            titles += pack.get("titles", []) or []
-            queries = pack.get("queries", []) or []
-        except Exception:
-            pass
-    if not queries:
-        queries = [extract_keywords(q), q]
-
-    qn = norm_text(q)
-    actor_hint = ""
-    if "tom cruise" in qn:
-        actor_hint = "tom cruise"
-    else:
-        bigrams = re.findall(r"[a-z]+ [a-z]+", qn)
-        if bigrams:
-            actor_hint = bigrams[0]
-
-    titles = [x for i, x in enumerate(titles) if x and x not in titles[:i]]
-    queries = [x for i, x in enumerate(queries) if x and x not in queries[:i]]
-
-    found = []
-    errors = []
-
-    for t in titles[:preset["titles_max"]]:
-        try:
-            found += search_by_title(t, country, show_type, lang)
-        except Exception as e:
-            errors.append(str(e))
-    for kw in queries[:preset["queries_max"]]:
-        try:
-            found += search_by_keyword(kw, country, show_type, lang)
-        except Exception as e:
-            errors.append(str(e))
-    if (not st.session_state.get("actor_search")) and len(found) < preset["en_if_under"]:
-        for kw in queries[:preset["queries_max"]]:
-            try:
-                found += search_by_keyword(kw, country, show_type, "en")
-            except Exception as e:
-                errors.append(str(e))
-
-    found = merge_results(found)
-
-    allowed_services = set(profile.get("platform_ids", []))
-    enriched = []
-    for i, sh in enumerate(found):
-        opts_all = ((sh.get("streamingOptions") or {}).get(country) or [])
-        opts_all = dedupe_streaming_options(opts_all)
-        opts_mine = [o for o in opts_all if option_on_my_services(o, allowed_services)]
-        opts_mine = dedupe_streaming_options(opts_mine)
-        is_mine = 1 if opts_mine else 0
-        rel = relevance_score(sh, q, actor_hint=actor_hint) + 0.30 * is_mine
-        year = parse_year_value(sh)
-        score100, sources = (None, "")
-        if i < preset["omdb_top"]:
-            score100, sources = critic_score_and_sources(sh)
-        elif isinstance(sh.get("rating"), (int, float)):
-            score100 = float(sh["rating"])
-            sources = f"Score {int(score100)}/100"
-        enriched.append({
-            "show": sh,
-            "rel": rel,
-            "year": year,
-            "score100": score100,
-            "sources": sources,
-            "is_mine": is_mine,
-        })
-
-    if selected_genres:
-        wanted = {norm_text(g) for g in selected_genres}
-        keep = []
-        for item in enriched:
-            genres = item["show"].get("genres") or []
-            norm_genres = {norm_text(g) for g in genres}
-            if wanted & norm_genres:
-                keep.append(item)
-        enriched = keep
-
-    if selected_years:
-        enriched = [item for item in enriched if item.get("year") in selected_years]
-
-    if only_my_apps:
-        keep = [x for x in enriched if x["is_mine"] == 1]
-        enriched = keep if keep else enriched
-
-    if sort_mode == "Pertinence":
-        enriched.sort(key=lambda x: (x["rel"], x["is_mine"]), reverse=True)
-    elif sort_mode == "Année (récent)":
-        enriched.sort(key=lambda x: (x["year"], x["is_mine"]), reverse=True)
-    else:
-        enriched.sort(key=lambda x: ((x["score100"] is not None), (x["score100"] or -1), x["is_mine"]), reverse=True)
-
-    if enriched:
-        st.session_state["last_results"] = enriched[:preset["pool"]]
-    else:
-        if errors:
-            joined = " | ".join(dict.fromkeys(errors))
-            if api_is_quota_error(joined):
-                st.session_state["api_preview_notice"] = "Mode aperçu visuel : quota API atteint. Je t'affiche une carte d'exemple pour tester l'interface."
-            else:
-                st.session_state["api_preview_notice"] = "Mode aperçu visuel : l'API n'a pas répondu correctement. Je t'affiche une carte d'exemple pour tester l'interface."
-            st.session_state["api_error_notice"] = joined[:400]
-            st.session_state["last_results"] = build_mock_result(q, allowed_services, st.session_state.get("actor_search", ""))
-        else:
-            st.session_state["last_results"] = []
-
-    st.session_state["last_query"] = q
-    st.session_state["last_mode"] = mode
+def run_search():
+    st.session_state["last_query"] = " ".join(x for x in [st.session_state.get("q_main", ""), st.session_state.get("q_more", "")] if x.strip())
     st.session_state["scroll_results"] = True
 
-# ================== DISPLAY RESULTS ==================
-results = st.session_state.get("last_results")
-if results is not None:
-    st.markdown("<div id='ff-results-anchor'></div>", unsafe_allow_html=True)
-    st.markdown(
-        f"<div class='ff-inline-note'>Requête : <b>{escape(st.session_state.get('last_query', ''))}</b> — Mode : <b>{escape(st.session_state.get('last_mode', ''))}</b></div>",
-        unsafe_allow_html=True,
-    )
-    if st.session_state.get("api_preview_notice"):
-        st.markdown(f"<div class='ff-preview-note'>{escape(st.session_state['api_preview_notice'])}</div>", unsafe_allow_html=True)
-    if st.session_state.get("api_error_notice"):
-        st.caption(st.session_state["api_error_notice"])
 
-    st.markdown(
-        f"<div class='ff-inline-note'>✅ Résultats : {min(len(results), 20)} / {len(results)}</div>",
-        unsafe_allow_html=True,
-    )
+def actor_mode_name():
+    qp = st.query_params
+    val = qp.get("actor")
+    if isinstance(val, list):
+        val = val[0] if val else ""
+    return str(val or "")
 
-    if not results:
-        st.info("Aucun résultat pour ces critères.")
-    else:
-        for item in results[:20]:
-            render_result(item, profile, actor_mode=bool(st.session_state.get("actor_search")))
 
-    if st.session_state.get("scroll_results"):
-        scroll_to_results()
-        st.session_state["scroll_results"] = False
+def clear_actor_mode():
+    qp = st.query_params
+    qp.clear()
+    st.rerun()
+
+
+apply_theme()
+
+# ---------- PAGE 1: ACCUEIL ----------
+if not st.session_state["entered"]:
+    st.markdown("<div class='ff-title-pill'><h1>FilmFinder IA</h1></div>", unsafe_allow_html=True)
+    st.markdown("<div class='ff-subtitle'>Souvenir flou → titres probables → où regarder.</div>", unsafe_allow_html=True)
+
+    with st.form("profile_form"):
+        st.markdown("<div class='ff-bubble ff-wide'>", unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns([1, 1, 1, 0.7])
+        with c1:
+            country = st.selectbox("Pays", ["FR", "US", "GB", "CA", "BE", "CH"], index=["FR", "US", "GB", "CA", "BE", "CH"].index(profile["country"]))
+        with c2:
+            lang = st.selectbox("Langue", ["fr-FR", "en-US", "en-GB"], index=["fr-FR", "en-US", "en-GB"].index(profile["lang"]))
+        with c3:
+            show_type_ui = st.selectbox("Type", ["Film", "Série"], index=0 if profile["show_type"] == "movie" else 1)
+        with c4:
+            show_elsewhere = st.checkbox("Ailleurs", value=profile.get("show_elsewhere", False))
+
+        selected_names = [SERVICE_BY_ID[sid]["name"] for sid in profile.get("platform_ids", []) if sid in SERVICE_BY_ID]
+        platforms = st.multiselect("Tes plateformes", SERVICE_NAMES, default=selected_names)
+        submit = st.form_submit_button("Entrer")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    if submit:
+        profile["country"] = country
+        profile["lang"] = lang
+        profile["show_type"] = "movie" if show_type_ui == "Film" else "tv"
+        profile["platform_ids"] = [NAME_TO_ID[x] for x in platforms if x in NAME_TO_ID]
+        profile["show_elsewhere"] = show_elsewhere
+        save_profile(profile)
+        st.session_state["entered"] = True
+        st.rerun()
+    st.stop()
+
+# ---------- PAGE 2: RECHERCHE ----------
+actor_name = actor_mode_name()
+st.markdown("<div class='ff-title-pill'><h1>Recherche</h1></div>", unsafe_allow_html=True)
+
+st.markdown("<div class='ff-pill'>Mode</div>", unsafe_allow_html=True)
+st.session_state["mode"] = st.radio("Mode", ["Rapide", "Normal", "Profond"], index=["Rapide", "Normal", "Profond"].index(st.session_state.get("mode", "Normal")), horizontal=True, label_visibility="collapsed")
+
+if actor_name:
+    st.markdown(f"<div class='ff-bubble ff-note'>Recherche acteur : <b>{escape(actor_name)}</b> — recherche automatique des {'films' if profile['show_type']=='movie' else 'séries'} de cet acteur.</div>", unsafe_allow_html=True)
+    if st.button("Retour recherche normale"):
+        clear_actor_mode()
+
+st.markdown("<div class='ff-pill'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
+cq1, cx1 = st.columns([6.7, 0.9], vertical_alignment="bottom")
+with cq1:
+    st.markdown("<div class='ff-inline-input'>", unsafe_allow_html=True)
+    st.text_input("Ton souvenir", key="q_main", placeholder="Ex: homme extraterrestre renaît", label_visibility="collapsed", on_change=run_search)
+    st.markdown("</div>", unsafe_allow_html=True)
+with cx1:
+    st.markdown("<div class='ff-clear'>", unsafe_allow_html=True)
+    st.button("✕", key="clear_main", on_click=clear_q_main)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+cbtn, _ = st.columns([1.3, 4.5])
+with cbtn:
+    st.markdown("<div class='ff-accent'>", unsafe_allow_html=True)
+    if st.button("Trouver"):
+        run_search()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("<div class='ff-pill'>Détails (optionnel)</div>", unsafe_allow_html=True)
+cq2, cx2 = st.columns([6.7, 0.9], vertical_alignment="top")
+with cq2:
+    st.markdown("<div class='ff-inline-input'>", unsafe_allow_html=True)
+    st.text_area("Détails", key="q_more", placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…", label_visibility="collapsed")
+    st.markdown("</div>", unsafe_allow_html=True)
+with cx2:
+    st.markdown("<div class='ff-clear'>", unsafe_allow_html=True)
+    st.button("✕", key="clear_more", on_click=clear_q_more)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("<div class='ff-pill'>Filtres</div>", unsafe_allow_html=True)
+with st.expander("Filtres", expanded=False):
+    fg, fy = st.columns(2)
+    with fg:
+        selected_genres = [g for g in GENRES_UI if st.checkbox(g, value=g in st.session_state.get("selected_genres", []), key=f"genre_{g}")]
+    with fy:
+        selected_years = [y for y in YEARS_UI[:18] if st.checkbox(y, value=y in st.session_state.get("selected_years", []), key=f"year_{y}")]
+    st.session_state["selected_genres"] = selected_genres
+    st.session_state["selected_years"] = selected_years
+
+st.markdown("<div class='ff-pill'>Trier par</div>", unsafe_allow_html=True)
+st.session_state["sort_mode"] = st.selectbox("Trier par", ["Pertinence", "Note (haute)", "Année (récente)"], index=["Pertinence", "Note (haute)", "Année (récente)"].index(st.session_state.get("sort_mode", "Pertinence")), label_visibility="collapsed")
+
+st.markdown("<div class='ff-pill'>Uniquement sur mes applis</div>", unsafe_allow_html=True)
+st.session_state["mine_only"] = st.checkbox("Uniquement sur mes applis", value=st.session_state.get("mine_only", False), label_visibility="collapsed")
+
+# Search execution
+results = []
+error_text = ""
+search_needed = bool(st.session_state.get("last_query")) or bool(actor_name)
+if search_needed:
+    try:
+        if actor_name:
+            base = search_actor_movies(actor_name, profile["show_type"], profile["lang"], profile["country"], profile.get("platform_ids", []))
+        else:
+            main_query = st.session_state.get("q_main", "").strip()
+            if main_query:
+                base = search_tmdb_free(main_query, st.session_state.get("q_more", ""), profile["show_type"], profile["lang"], profile["country"], profile.get("platform_ids", []), st.session_state.get("mode", "Normal"))
+            else:
+                base = []
+        results = apply_filters_and_sort(base, st.session_state.get("selected_genres", []), st.session_state.get("selected_years", []), st.session_state.get("mine_only", False), st.session_state.get("sort_mode", "Pertinence"))
+        st.session_state["last_results"] = results
+    except Exception as e:
+        error_text = str(e)
+        results = st.session_state.get("last_results", []) or []
+else:
+    results = st.session_state.get("last_results", []) or []
+
+st.markdown("<div id='results-anchor' class='ff-scroll-anchor'></div>", unsafe_allow_html=True)
+if st.session_state.get("scroll_results"):
+    scroll_to_results()
+    st.session_state["scroll_results"] = False
+
+if error_text:
+    st.markdown(f"<div class='ff-bubble ff-note'>⚠️ {escape(error_text)}</div>", unsafe_allow_html=True)
+
+if not TMDB_API_KEY and not TMDB_BEARER_TOKEN:
+    st.markdown("<div class='ff-bubble ff-note'>ℹ️ V1 gratuite prête : ajoute d'abord <b>TMDB_API_KEY</b> dans les Secrets Streamlit pour activer la recherche réelle.</div>", unsafe_allow_html=True)
+
+if search_needed:
+    query_label = actor_name if actor_name else st.session_state.get("last_query", "")
+    st.markdown(f"<div class='ff-bubble ff-note'>Requête : {escape(query_label)} — Mode : {escape(st.session_state.get('mode','Normal'))}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='ff-bubble ff-note'>✅ Résultats : {len(results)}</div>", unsafe_allow_html=True)
+
+for item in results:
+    st.markdown("<div class='ff-result-card'>", unsafe_allow_html=True)
+    render_result(item)
+    st.markdown("</div>", unsafe_allow_html=True)
