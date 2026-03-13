@@ -41,7 +41,7 @@ THEMES = {
         "bubble_radius": "24px",
         "card_bg": "rgba(255,255,255,0.95)",
         "card_border": "rgba(255,255,255,0.85)",
-        "page_scrim": "linear-gradient(rgba(236,240,245,0.54), rgba(236,240,245,0.60))",
+        "page_scrim": "linear-gradient(rgba(236,240,245,0.30), rgba(236,240,245,0.36))",
     },
     "B": {
         "name": "Compact Pro",
@@ -375,36 +375,47 @@ def demo_bg_data_uri():
     svg = """
     <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1080 1920'>
       <defs>
-        <linearGradient id='g1' x1='0' y1='0' x2='1' y2='1'>
-          <stop offset='0%' stop-color='#1f2937'/>
-          <stop offset='40%' stop-color='#7c2d12'/>
+        <linearGradient id='bg' x1='0' y1='0' x2='1' y2='1'>
+          <stop offset='0%' stop-color='#0f172a'/>
+          <stop offset='38%' stop-color='#1e293b'/>
           <stop offset='100%' stop-color='#111827'/>
         </linearGradient>
-        <linearGradient id='g2' x1='0' y1='0' x2='1' y2='0'>
-          <stop offset='0%' stop-color='#ef4444'/>
-          <stop offset='100%' stop-color='#f59e0b'/>
-        </linearGradient>
-        <linearGradient id='g3' x1='0' y1='0' x2='0' y2='1'>
-          <stop offset='0%' stop-color='#0f172a'/>
-          <stop offset='100%' stop-color='#1d4ed8'/>
-        </linearGradient>
-        <filter id='blur'><feGaussianBlur stdDeviation='10'/></filter>
+        <radialGradient id='glow1'>
+          <stop offset='0%' stop-color='#f59e0b' stop-opacity='0.65'/>
+          <stop offset='100%' stop-color='#f59e0b' stop-opacity='0'/>
+        </radialGradient>
+        <radialGradient id='glow2'>
+          <stop offset='0%' stop-color='#60a5fa' stop-opacity='0.55'/>
+          <stop offset='100%' stop-color='#60a5fa' stop-opacity='0'/>
+        </radialGradient>
+        <radialGradient id='glow3'>
+          <stop offset='0%' stop-color='#ec4899' stop-opacity='0.40'/>
+          <stop offset='100%' stop-color='#ec4899' stop-opacity='0'/>
+        </radialGradient>
+        <filter id='blur24'><feGaussianBlur stdDeviation='24'/></filter>
+        <filter id='blur40'><feGaussianBlur stdDeviation='40'/></filter>
+        <filter id='posterBlur'><feGaussianBlur stdDeviation='8'/></filter>
       </defs>
-      <rect width='1080' height='1920' fill='url(#g1)'/>
-      <rect x='40' y='80' width='300' height='460' rx='28' fill='url(#g2)' opacity='0.88'/>
-      <rect x='380' y='120' width='270' height='400' rx='28' fill='#7c3aed' opacity='0.86'/>
-      <rect x='700' y='70' width='320' height='500' rx='28' fill='url(#g3)' opacity='0.92'/>
-      <rect x='70' y='610' width='260' height='420' rx='28' fill='#0ea5e9' opacity='0.82'/>
-      <rect x='380' y='590' width='290' height='430' rx='28' fill='#111827' opacity='0.88'/>
-      <rect x='720' y='640' width='280' height='420' rx='28' fill='#ec4899' opacity='0.78'/>
-      <rect x='60' y='1110' width='320' height='470' rx='28' fill='#16a34a' opacity='0.80'/>
-      <rect x='430' y='1070' width='260' height='450' rx='28' fill='#f97316' opacity='0.85'/>
-      <rect x='720' y='1130' width='270' height='430' rx='28' fill='#334155' opacity='0.90'/>
-      <circle cx='140' cy='1620' r='170' fill='#ffffff' opacity='0.10' filter='url(#blur)'/>
-      <circle cx='940' cy='240' r='180' fill='#ffffff' opacity='0.10' filter='url(#blur)'/>
-      <circle cx='820' cy='1680' r='150' fill='#fb7185' opacity='0.16' filter='url(#blur)'/>
-      <circle cx='350' cy='920' r='140' fill='#fde68a' opacity='0.10' filter='url(#blur)'/>
-      <rect x='0' y='0' width='1080' height='1920' fill='rgba(0,0,0,0.10)'/>
+      <rect width='1080' height='1920' fill='url(#bg)'/>
+      <circle cx='160' cy='260' r='280' fill='url(#glow1)' filter='url(#blur40)'/>
+      <circle cx='930' cy='360' r='280' fill='url(#glow2)' filter='url(#blur40)'/>
+      <circle cx='780' cy='1480' r='240' fill='url(#glow3)' filter='url(#blur40)'/>
+      <g opacity='0.46' filter='url(#posterBlur)'>
+        <rect x='55' y='120' width='205' height='300' rx='16' fill='#7f1d1d'/>
+        <rect x='290' y='90' width='220' height='330' rx='16' fill='#1d4ed8'/>
+        <rect x='540' y='130' width='185' height='280' rx='16' fill='#6d28d9'/>
+        <rect x='760' y='85' width='250' height='350' rx='16' fill='#0f766e'/>
+        <rect x='85' y='500' width='200' height='300' rx='16' fill='#374151'/>
+        <rect x='330' y='480' width='230' height='340' rx='16' fill='#9a3412'/>
+        <rect x='610' y='520' width='195' height='290' rx='16' fill='#0f172a'/>
+        <rect x='825' y='495' width='170' height='265' rx='16' fill='#a21caf'/>
+        <rect x='70' y='885' width='210' height='320' rx='16' fill='#0f766e'/>
+        <rect x='315' y='870' width='245' height='350' rx='16' fill='#1e3a8a'/>
+        <rect x='610' y='900' width='190' height='300' rx='16' fill='#b91c1c'/>
+        <rect x='830' y='860' width='185' height='280' rx='16' fill='#9333ea'/>
+      </g>
+      <rect x='0' y='0' width='1080' height='1920' fill='rgba(255,255,255,0.04)'/>
+      <rect x='0' y='0' width='1080' height='1920' fill='rgba(0,0,0,0.18)'/>
     </svg>
     """.strip()
     data = base64.b64encode(svg.encode("utf-8")).decode("ascii")
@@ -483,7 +494,7 @@ def apply_theme():
         margin: 10px 0 10px 0;
         padding: 8px 12px;
         border-radius: 999px;
-        background: rgba(255,255,255,0.88);
+        background: rgba(255,255,255,0.92);
         border: 1px solid rgba(210,216,226,0.84);
         font-weight: 600;
     }}
@@ -581,7 +592,7 @@ def apply_theme():
         border-radius: {THEME['bubble_radius']} !important;
         box-shadow: {THEME['bubble_shadow']} !important;
         backdrop-filter: blur(12px);
-        padding: 10px 10px 8px 10px !important;
+        padding: 8px 10px 6px 10px !important;
         margin: 0 0 14px 0 !important;
     }}
     div[data-testid='stVerticalBlockBorderWrapper'] > div {{
@@ -1089,15 +1100,20 @@ q_more_default = st.session_state.get("last_typed_more", "")
 st.session_state.setdefault("q_main", q_main_default)
 st.session_state.setdefault("q_more", q_more_default)
 
-search_shell = st.container(border=True)
-with search_shell:
-    st.markdown("<h1 class='ff-title' style='font-size:2.8rem'>Recherche</h1>", unsafe_allow_html=True)
+title_box = st.container(border=True)
+with title_box:
+    st.markdown("<h1 class='ff-title' style='font-size:2.8rem; margin-bottom:0;'>Recherche</h1>", unsafe_allow_html=True)
+
+mode_box = st.container(border=True)
+with mode_box:
     mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1)
     preset = MODE_PRESETS[mode]
 
-    if st.session_state.get("actor_search"):
+if st.session_state.get("actor_search"):
+    actor_box = st.container(border=True)
+    with actor_box:
         actor = st.session_state["actor_search"]
-        st.markdown(f"<div class='ff-inline-note'>Recherche acteur : <b>{escape(actor)}</b> — recherche automatique des films de cet acteur.</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='ff-inline-note' style='margin:0; box-shadow:none;'>Recherche acteur : <b>{escape(actor)}</b> — recherche automatique des films de cet acteur.</div>", unsafe_allow_html=True)
         if st.button("Retour recherche normale"):
             st.session_state["actor_search"] = ""
             st.session_state["last_results"] = None
@@ -1109,8 +1125,10 @@ with search_shell:
                 pass
             st.rerun()
 
+souvenir_box = st.container(border=True)
+with souvenir_box:
     st.markdown("<div class='ff-field-label'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
-    col1, col2 = st.columns([14, 1], gap="small")
+    col1, col2 = st.columns([12, 1], gap="small")
     with col1:
         q_main = st.text_input(
             "Ton souvenir (Entrée lance)",
@@ -1126,13 +1144,13 @@ with search_shell:
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    cbtn1, cbtn2 = st.columns([1, 5])
-    with cbtn1:
-        if st.button("Trouver", type="primary"):
-            st.session_state["do_search"] = True
+if st.button("Trouver", type="primary"):
+    st.session_state["do_search"] = True
 
+details_box = st.container(border=True)
+with details_box:
     st.markdown("<div class='ff-field-label'>Détails (optionnel)</div>", unsafe_allow_html=True)
-    col3, col4 = st.columns([14, 1], gap="small")
+    col3, col4 = st.columns([12, 1], gap="small")
     with col3:
         q_more = st.text_area(
             "Détails (optionnel)",
@@ -1147,6 +1165,8 @@ with search_shell:
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
+filters_box = st.container(border=True)
+with filters_box:
     with st.expander("Filtres", expanded=False):
         left, right = st.columns(2)
         selected_genres = []
@@ -1162,12 +1182,17 @@ with search_shell:
                 if st.checkbox(y, key=f"year_{y}"):
                     selected_years.append(int(y))
 
+sort_box = st.container(border=True)
+with sort_box:
     sort_mode = st.selectbox(
         "Trier par",
         ["Pertinence", "Année (récent)", "Note (haute)"],
         index=["Pertinence", "Année (récent)", "Note (haute)"].index(st.session_state.get("sort_mode", "Pertinence")),
     )
     st.session_state["sort_mode"] = sort_mode
+
+apps_box = st.container(border=True)
+with apps_box:
     only_my_apps = st.checkbox("Uniquement sur mes applis", value=False)
 
 # ================== SEARCH ACTION ==================
