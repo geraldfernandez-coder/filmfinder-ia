@@ -251,37 +251,82 @@ def apply_theme():
         position: fixed;
         inset: 0;
         z-index: -2;
-        background-image: linear-gradient(rgba(10,15,30,0.20), rgba(10,15,30,0.16)), url('{bg}');
+        background-image: linear-gradient(rgba(18,23,34,0.28), rgba(18,23,34,0.22)), url('{bg}');
         background-size: cover;
         background-position: center center;
-        filter: saturate(1.02);
+        filter: saturate(1.04);
     }}
     [data-testid='stHeader'] {{ background: transparent !important; }}
-    .main .block-container {{ max-width: 980px !important; padding-top: 10px !important; padding-bottom: 90px !important; }}
+    .main .block-container {{
+        max-width: 980px !important;
+        padding-top: 14px !important;
+        padding-bottom: 90px !important;
+        background: transparent !important;
+    }}
 
-    .ff-pill, .ff-bubble, .ff-title-pill {{
+    .ff-title-pill,
+    .ff-pill,
+    .ff-inline-note,
+    .ff-checkbox-shell {{
         display: inline-block;
-        background: rgba(255,255,255,0.92);
-        border: 1px solid rgba(255,255,255,0.78);
-        border-radius: 24px;
-        box-shadow: 0 12px 28px rgba(12, 18, 31, 0.12);
+        background: rgba(255,255,255,0.94);
+        border: 1px solid rgba(255,255,255,0.82);
+        border-radius: 22px;
+        box-shadow: 0 12px 30px rgba(19, 24, 38, 0.10);
         backdrop-filter: blur(12px);
         color: #17233b;
     }}
-    .ff-title-pill {{ padding: 12px 20px; margin-bottom: 12px; }}
-    .ff-title-pill h1 {{ margin: 0; font-size: 2.4rem; line-height: 1; font-weight: 800; }}
-    .ff-subtitle {{
-        display: inline-block; padding: 10px 14px; margin-bottom: 16px; border-radius: 18px;
-        background: rgba(255,255,255,0.82); color: rgba(23,35,59,0.85);
-        backdrop-filter: blur(10px); box-shadow: 0 10px 22px rgba(12,18,31,0.08);
+    .ff-title-pill {{
+        padding: 10px 18px;
+        margin: 0 0 10px 0;
+        border-radius: 20px;
     }}
-    .ff-pill {{ padding: 6px 14px; margin: 0 0 8px 0; font-weight: 700; }}
-    .ff-bubble {{ display:block; width: fit-content; max-width: 100%; padding: 10px 16px; margin: 0 0 10px 0; }}
-    .ff-wide {{ display:block; width:100%; padding: 12px 16px; }}
+    .ff-title {{
+        margin: 0;
+        color: #17233b;
+        font-size: 2.45rem;
+        line-height: 1;
+        font-weight: 800;
+    }}
+    .ff-subtitle {{
+        display: inline-block;
+        padding: 10px 14px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.80);
+        color: rgba(23,35,59,0.82);
+        margin: 0 0 14px 0;
+        box-shadow: 0 10px 22px rgba(19,24,38,0.08);
+        backdrop-filter: blur(10px);
+    }}
+    .ff-pill {{
+        padding: 6px 12px;
+        margin: 6px 0 6px 0;
+        color: #17233b;
+        font-weight: 700;
+        border-radius: 999px;
+    }}
+    .ff-inline-note {{
+        padding: 9px 12px;
+        margin: 4px 0 10px 0;
+        color: rgba(23,35,59,0.88);
+        border-radius: 18px;
+    }}
+    .ff-bubble {{
+        display:block;
+        width: fit-content;
+        max-width: 100%;
+        padding: 10px 14px;
+        background: rgba(255,255,255,0.94);
+        border: 1px solid rgba(255,255,255,0.82);
+        border-radius: 20px;
+        box-shadow: 0 12px 30px rgba(19, 24, 38, 0.10);
+        backdrop-filter: blur(12px);
+    }}
+    .ff-wide {{ width: 100%; }}
     .ff-note {{ font-size: 0.98rem; color: #223455; }}
     .ff-small {{ font-size: 0.92rem; opacity: 0.9; }}
-    .ff-actorline a {{ color:#1d4ed8; text-decoration:none; font-weight:600; }}
-    .ff-actorline a:hover {{ text-decoration:underline; }}
+    .ff-actorline a {{ color:#0b57d0 !important; text-decoration:none !important; font-weight:600; }}
+    .ff-actorline a:hover {{ text-decoration:underline !important; }}
     .ff-platforms {{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 10px 0; }}
     .ff-chip {{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:rgba(255,255,255,0.92); border:1px solid rgba(255,255,255,0.72); box-shadow:0 10px 24px rgba(12,18,31,0.08); }}
     .ff-chip.mine {{ background: rgba(255,79,95,0.16); border-color: rgba(255,79,95,0.30); color:#8b1220; font-weight:700; }}
@@ -291,32 +336,151 @@ def apply_theme():
     .ff-stars .bot {{ color:#d1d5db; }}
     .ff-stars .top {{ color:#fbbf24; position:absolute; overflow:hidden; white-space:nowrap; left:0; top:0; }}
     .ff-stars {{ position:relative; display:inline-block; letter-spacing:2px; font-size:1rem; line-height:1; margin-right:8px; }}
-    .ff-inline-input {{ max-width: 300px; width: 100%; }}
-    .ff-inline-input.ff-textarea {{ max-width: 300px; }}
-    .ff-inline-input .stTextInput, .ff-inline-input .stTextArea {{ margin-bottom:0 !important; }}
-    .ff-inline-input [data-testid='stHorizontalBlock'] {{ align-items:center !important; gap:8px !important; }}
-    .ff-inline-input [data-baseweb='input'], .ff-inline-input textarea {{ background:rgba(255,255,255,0.96)!important; border-radius:18px!important; border:1px solid rgba(255,255,255,0.82)!important; max-width:100% !important; }}
-    .ff-inline-input textarea {{ min-height: 112px !important; }}
-    .ff-clear button {{ height:36px !important; width:36px !important; min-height:36px !important; border-radius:12px !important; padding:0 !important; }}
-    .ff-accent button {{ background:#ff4f5f !important; color:white !important; border:none !important; border-radius:18px !important; box-shadow: 0 12px 28px rgba(255,79,95,0.28) !important; font-weight:700 !important; }}
-    .ff-section-space {{ height:6px; }}
-    .ff-scroll-anchor {{ position:relative; top:-16px; }}
-    .ff-hero-space {{ height: 8px; }}
 
-    div[data-testid='stMarkdownContainer'] p {{ color:#17233b; }}
-    .stSelectbox label, .stCheckbox label, .stRadio label {{ color:#17233b !important; font-weight:600; }}
-    .stSelectbox [data-baseweb='select'] > div, .stMultiSelect [data-baseweb='select'] > div {{ border-radius:18px !important; border:1px solid rgba(255,255,255,0.78)!important; background:rgba(255,255,255,0.94)!important; }}
-    .stMultiSelect [data-baseweb='tag'] {{ background:#ff4f5f !important; color:white !important; border-radius:12px !important; }}
+    section[data-testid='stSidebar'] > div:first-child {{
+        background: rgba(255,255,255,0.78) !important;
+        backdrop-filter: blur(10px);
+        border-right: 1px solid rgba(255,255,255,0.5);
+    }}
 
-    @media (max-width: 768px) {{
-        .main .block-container {{ padding-left: 16px !important; padding-right: 16px !important; }}
-        .ff-title-pill h1 {{ font-size: 2.05rem; }}
-        .ff-result-title {{ font-size: 1.65rem; }}
-        .ff-title-pill {{ padding: 12px 18px; }}
-        .ff-pill {{ padding: 6px 12px; }}
-        .ff-inline-input {{ max-width: 230px; width: 230px; }}
-        .ff-inline-input.ff-textarea {{ max-width: 230px; width: 230px; }}
-        .ff-clear button {{ height:34px !important; width:34px !important; min-height:34px !important; border-radius:12px !important; }}
+    div[data-testid='stTextInput'] > div > div,
+    div[data-testid='stTextArea'] > div > div,
+    div[data-baseweb='select'],
+    div[data-testid='stMultiSelect'] [data-baseweb='select'] {{
+        background: rgba(255,255,255,0.96) !important;
+        border: 1px solid rgba(214,220,229,0.96) !important;
+        border-radius: 18px !important;
+        box-shadow: 0 8px 18px rgba(20, 24, 35, 0.06) !important;
+    }}
+    div[data-testid='stTextInput'],
+    div[data-testid='stTextArea'] {{
+        max-width: 360px;
+    }}
+    div[data-testid='stTextInput'] input,
+    div[data-testid='stTextArea'] textarea {{
+        color: #17233b !important;
+        font-size: 1rem !important;
+    }}
+    div[data-testid='stTextArea'] textarea {{ min-height: 94px !important; }}
+
+    div[data-testid='stCheckbox'] {{
+        display: inline-block;
+        background: rgba(255,255,255,0.94);
+        border: 1px solid rgba(255,255,255,0.82);
+        border-radius: 18px;
+        box-shadow: 0 10px 22px rgba(19,24,38,0.08);
+        backdrop-filter: blur(10px);
+        padding: 6px 12px 6px 10px;
+        margin-top: 8px;
+    }}
+
+    div[data-testid='stRadio'] > label,
+    div[data-testid='stSelectbox'] label,
+    div[data-testid='stMultiSelect'] label,
+    div[data-testid='stTextInput'] label,
+    div[data-testid='stTextArea'] label {{
+        color: #17233b !important;
+        font-weight: 600 !important;
+    }}
+
+    div[data-testid='stRadio'] [role='radiogroup'] {{
+        display: inline-flex !important;
+        flex-wrap: wrap !important;
+        gap: 16px !important;
+        background: rgba(255,255,255,0.94) !important;
+        border: 1px solid rgba(255,255,255,0.82) !important;
+        border-radius: 22px !important;
+        box-shadow: 0 10px 22px rgba(19,24,38,0.08) !important;
+        backdrop-filter: blur(10px) !important;
+        padding: 10px 14px !important;
+    }}
+
+    .stButton > button, button[kind='secondary'], button[kind='tertiary'] {{
+        border-radius: 16px !important;
+        border: 1px solid rgba(212,218,228,0.96) !important;
+        background: rgba(255,255,255,0.96) !important;
+        color: #17233b !important;
+        min-height: 46px !important;
+        padding: 0 16px !important;
+        box-shadow: 0 10px 22px rgba(19,24,38,0.08) !important;
+        font-weight: 700 !important;
+    }}
+    .stButton > button[kind='primary'] {{
+        background: #ff4f5f !important;
+        border-color: #ff4f5f !important;
+        color: white !important;
+    }}
+    .ff-clear-col button {{
+        min-width: 34px !important;
+        width: 34px !important;
+        height: 34px !important;
+        padding: 0 !important;
+        font-size: 17px !important;
+        border-radius: 12px !important;
+        margin-top: 2px !important;
+    }}
+
+    div[data-testid='stExpander'] {{
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }}
+    div[data-testid='stExpander'] details {{
+        background: rgba(255,255,255,0.94) !important;
+        border: 1px solid rgba(255,255,255,0.82) !important;
+        border-radius: 22px !important;
+        box-shadow: 0 10px 22px rgba(19,24,38,0.08) !important;
+        backdrop-filter: blur(10px) !important;
+        overflow: hidden;
+    }}
+    div[data-testid='stExpander'] details summary {{
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+    }}
+    div[data-testid='stExpander'] details summary p {{ font-weight: 700 !important; color:#17233b !important; }}
+    .stAlert {{ border-radius: 18px !important; }}
+    .ff-preview-note {{
+        background: rgba(255, 245, 204, 0.86);
+        color: #5a4606;
+        border: 1px solid rgba(230, 198, 86, 0.65);
+        border-radius: 16px;
+        padding: 10px 12px;
+        margin: 10px 0 8px 0;
+    }}
+
+    @media (max-width: 900px) {{
+        .ff-title {{ font-size: 2.25rem; }}
+        .main .block-container {{ padding-left: 12px !important; padding-right: 12px !important; }}
+    }}
+    @media (max-width: 520px) {{
+        .ff-title {{ font-size: 2rem; }}
+        .main .block-container {{ padding-left: 8px !important; padding-right: 8px !important; }}
+        .ff-title-pill {{ padding: 8px 14px; border-radius: 18px; }}
+        .ff-pill {{ padding: 5px 11px; margin: 4px 0 5px 0; }}
+        .ff-inline-note {{ padding: 8px 10px; }}
+        div[data-testid='stHorizontalBlock'] {{
+            flex-wrap: nowrap !important;
+            align-items: flex-start !important;
+            gap: 8px !important;
+        }}
+        div[data-testid='stTextInput'],
+        div[data-testid='stTextArea'] {{
+            max-width: 300px !important;
+            min-width: 0 !important;
+        }}
+        .ff-clear-col button {{
+            min-width: 30px !important;
+            width: 30px !important;
+            height: 30px !important;
+            font-size: 15px !important;
+            border-radius: 10px !important;
+        }}
+        div[data-testid='stTextInput'] input,
+        div[data-testid='stTextArea'] textarea {{
+            font-size: 0.95rem !important;
+        }}
+        div[data-testid='stTextArea'] textarea {{ min-height: 94px !important; }}
+        div[data-testid='stRadio'] [role='radiogroup'] {{ gap: 10px !important; padding: 9px 12px !important; }}
     }}
     </style>
     """
@@ -742,46 +906,55 @@ if not st.session_state["entered"]:
 
 # ---------- PAGE 2: RECHERCHE ----------
 actor_name = actor_mode_name()
-st.markdown("<div class='ff-title-pill'><h1>Recherche</h1></div>", unsafe_allow_html=True)
+st.markdown("<div class='ff-title-pill'><h1 class='ff-title' style='font-size:2.35rem;'>Recherche</h1></div>", unsafe_allow_html=True)
 
 st.markdown("<div class='ff-pill'>Mode</div>", unsafe_allow_html=True)
-st.session_state["mode"] = st.radio("Mode", ["Rapide", "Normal", "Profond"], index=["Rapide", "Normal", "Profond"].index(st.session_state.get("mode", "Normal")), horizontal=True, label_visibility="collapsed")
+st.session_state["mode"] = st.radio(
+    "Mode",
+    ["Rapide", "Normal", "Profond"],
+    index=["Rapide", "Normal", "Profond"].index(st.session_state.get("mode", "Normal")),
+    horizontal=True,
+    label_visibility="collapsed",
+)
 
 if actor_name:
-    st.markdown(f"<div class='ff-bubble ff-note'>Recherche acteur : <b>{escape(actor_name)}</b> — recherche automatique des {'films' if profile['show_type']=='movie' else 'séries'} de cet acteur.</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='ff-inline-note'>Recherche acteur : <b>{escape(actor_name)}</b> — recherche automatique des {'films' if profile['show_type']=='movie' else 'séries'} de cet acteur.</div>", unsafe_allow_html=True)
     if st.button("Retour recherche normale"):
         clear_actor_mode()
 
 st.markdown("<div class='ff-pill'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
-cq1, cx1 = st.columns([4.0, 0.55], vertical_alignment="center")
-with cq1:
-    st.markdown("<div class='ff-inline-input'>", unsafe_allow_html=True)
-    st.text_input("Ton souvenir", key="q_main", placeholder="Ex: homme extraterrestre renaît", label_visibility="collapsed", on_change=run_search)
-    st.markdown("</div>", unsafe_allow_html=True)
-with cx1:
-    st.markdown("<div class='ff-clear'>", unsafe_allow_html=True)
-    st.button("✕", key="clear_main", on_click=clear_q_main)
+col1, col2 = st.columns([9.0, 1.05], gap="small")
+with col1:
+    st.text_input(
+        "Ton souvenir (Entrée lance)",
+        key="q_main",
+        label_visibility="collapsed",
+        on_change=run_search,
+        placeholder="Ex: homme extraterrestre renaît",
+    )
+with col2:
+    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
+    st.button("✕", key="clear_main", help="Vider le souvenir", on_click=clear_q_main)
     st.markdown("</div>", unsafe_allow_html=True)
 
-cbtn, _ = st.columns([1.3, 4.5])
-with cbtn:
-    st.markdown("<div class='ff-accent'>", unsafe_allow_html=True)
-    if st.button("Trouver"):
-        run_search()
-    st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
+if st.button("Trouver", type="primary"):
+    run_search()
 
 st.markdown("<div class='ff-pill'>Détails (optionnel)</div>", unsafe_allow_html=True)
-cq2, cx2 = st.columns([4.0, 0.55], vertical_alignment="top")
-with cq2:
-    st.markdown("<div class='ff-inline-input ff-textarea'>", unsafe_allow_html=True)
-    st.text_area("Détails", key="q_more", placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…", label_visibility="collapsed")
-    st.markdown("</div>", unsafe_allow_html=True)
-with cx2:
-    st.markdown("<div class='ff-clear'>", unsafe_allow_html=True)
-    st.button("✕", key="clear_more", on_click=clear_q_more)
+col3, col4 = st.columns([9.0, 1.05], gap="small")
+with col3:
+    st.text_area(
+        "Détails (optionnel)",
+        key="q_more",
+        label_visibility="collapsed",
+        placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…",
+    )
+with col4:
+    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
+    st.button("✕", key="clear_more", help="Vider les détails", on_click=clear_q_more)
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("<div class='ff-pill'>Filtres</div>", unsafe_allow_html=True)
 with st.expander("Filtres", expanded=False):
     fg, fy = st.columns(2)
     with fg:
@@ -792,10 +965,19 @@ with st.expander("Filtres", expanded=False):
     st.session_state["selected_years"] = selected_years
 
 st.markdown("<div class='ff-pill'>Trier par</div>", unsafe_allow_html=True)
-st.session_state["sort_mode"] = st.selectbox("Trier par", ["Pertinence", "Note (haute)", "Année (récente)"], index=["Pertinence", "Note (haute)", "Année (récente)"].index(st.session_state.get("sort_mode", "Pertinence")), label_visibility="collapsed")
+st.session_state["sort_mode"] = st.selectbox(
+    "Trier par",
+    ["Pertinence", "Note (haute)", "Année (récente)"],
+    index=["Pertinence", "Note (haute)", "Année (récente)"].index(st.session_state.get("sort_mode", "Pertinence")),
+    label_visibility="collapsed",
+)
 
 st.markdown("<div class='ff-pill'>Uniquement sur mes applis</div>", unsafe_allow_html=True)
-st.session_state["mine_only"] = st.checkbox("Uniquement sur mes applis", value=st.session_state.get("mine_only", False), label_visibility="collapsed")
+st.session_state["mine_only"] = st.checkbox(
+    "Uniquement sur mes applis",
+    value=st.session_state.get("mine_only", False),
+    label_visibility="collapsed",
+)
 
 # Search execution
 results = []
