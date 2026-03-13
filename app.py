@@ -10,7 +10,10 @@ import xml.etree.ElementTree as ET
 
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
+import html
+from urllib.parse import quote
 
 # ================== CONFIG ==================
 load_dotenv()
@@ -71,8 +74,8 @@ def apply_theme():
         background: rgba(255,255,255,0.92);
         border: 1px solid rgba(0,0,0,0.08);
         border-radius: 16px;
-        padding: 8px 10px;
-        margin: 4px 0 8px 0;
+        padding: 10px 12px;
+        margin: 6px 0 10px 0;
         box-shadow: 0 5px 14px rgba(0,0,0,0.05);
     }
 
@@ -112,89 +115,68 @@ def apply_theme():
         margin-top: 6px !important;
     }
 
-    /* Widgets natifs : ciblage plus précis pour éviter les faux encadrés fins */
-    .stTextInput input,
-    .stTextArea textarea {
+    .stSelectbox [data-baseweb="select"],
+    .stMultiSelect [data-baseweb="select"]{
         background: rgba(255,255,255,0.96) !important;
         border-radius: 14px !important;
+        border: 1px solid rgba(0,0,0,0.08) !important;
+        min-height: 44px !important;
+        box-shadow: none !important;
     }
 
-    .stSelectbox [data-baseweb="select"],
-    .stMultiSelect [data-baseweb="select"] {
+    .stTextInput [data-baseweb="input"]{
+        background: rgba(255,255,255,0.96) !important;
+        border-radius: 14px !important;
+        border: 1px solid rgba(0,0,0,0.08) !important;
+        min-height: 44px !important;
+        box-shadow: none !important;
+    }
+
+    .stTextInput input{
+        background: transparent !important;
+    }
+
+    .stTextArea textarea{
         background: rgba(255,255,255,0.96) !important;
         border-radius: 14px !important;
         border: 1px solid rgba(0,0,0,0.08) !important;
         box-shadow: none !important;
+        min-height: 84px !important;
     }
 
-    .ff-inline-field{
-        background: rgba(255,255,255,0.96);
-        border: 1px solid rgba(0,0,0,0.10);
-        border-radius: 16px;
-        padding: 4px 6px 4px 10px;
-        margin: 2px 0 8px 0;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+    .ff-clear-col{
+        display:flex;
+        align-items:flex-end;
+        padding-top: 2px;
     }
 
-    .ff-inline-field [data-testid="stHorizontalBlock"]{
-        align-items: center !important;
-        gap: 6px !important;
-    }
-
-    .ff-inline-field .stTextInput,
-    .ff-inline-field .stTextArea,
-    .ff-inline-field .stMarkdown {
-        margin-bottom: 0 !important;
-    }
-
-    .ff-inline-field .stTextInput > label,
-    .ff-inline-field .stTextArea > label {
-        display: none !important;
-    }
-
-    .ff-inline-field .stTextInput > div,
-    .ff-inline-field .stTextArea > div,
-    .ff-inline-field .stTextInput > div > div,
-    .ff-inline-field .stTextArea > div > div {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        margin: 0 !important;
+    .ff-clear-col button{
+        min-width: 40px !important;
+        width: 40px !important;
+        height: 40px !important;
+        border-radius: 12px !important;
         padding: 0 !important;
     }
 
-    .ff-inline-field input,
-    .ff-inline-field textarea {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        padding: 8px 4px !important;
+    .ff-inline-actors{
+        font-size: 0.96rem;
+        line-height: 1.5;
+        margin-top: 6px;
     }
 
-    .ff-inline-field textarea {
-        min-height: 56px !important;
+    .ff-inline-actors a{
+        color:#0b57d0 !important;
+        text-decoration:none !important;
+        font-weight:500;
     }
 
-    .ff-inline-field .stButton {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        margin-top: 0 !important;
+    .ff-inline-actors a:hover{
+        text-decoration:underline !important;
     }
 
-    .ff-inline-field .stButton > button {
-        min-height: 38px !important;
-        height: 38px !important;
-        width: 38px !important;
-        min-width: 38px !important;
-        border-radius: 11px !important;
-        padding: 0 !important;
-        line-height: 1 !important;
-        font-size: 19px !important;
-    }
-
-    .stMultiSelect [data-baseweb="select"] {
-        border: 2px solid rgba(0,0,0,0.10) !important;
+    .ff-search-actions{
+        margin-top: 4px;
+        margin-bottom: 4px;
     }
 
     @media (max-width: 768px){
@@ -809,6 +791,20 @@ st.session_state.setdefault("last_query", "")
 st.session_state.setdefault("last_mode", "Normal")
 st.session_state.setdefault("actor_search", "")
 st.session_state.setdefault("sort_mode", "Pertinence")
+st.session_state.setdefault("scroll_to_results", False)
+
+# gestion clic acteur via query string
+qp_actor = st.query_params.get("actor")
+if isinstance(qp_actor, list):
+    qp_actor = qp_actor[0] if qp_actor else ""
+if qp_actor:
+    actor_clicked = str(qp_actor).strip()
+    if actor_clicked:
+        st.session_state["actor_search"] = actor_clicked
+        st.session_state["do_search"] = True
+        st.session_state["scroll_to_results"] = True
+        st.session_state["sort_mode"] = "Note (haute)"
+        st.query_params.clear()
 
 # ================== SIDEBAR ==================
 with st.sidebar:
@@ -929,19 +925,20 @@ if st.session_state.get("actor_search"):
     if st.button("⬅️ Retour recherche normale"):
         st.session_state["actor_search"] = ""
         st.session_state["last_results"] = None
+        st.session_state["scroll_to_results"] = False
         st.rerun()
 
 def trigger_search():
     st.session_state["do_search"] = True
+    st.session_state["scroll_to_results"] = True
 
 st.markdown("<div class='ff-panel'>", unsafe_allow_html=True)
 
 st.markdown("<div id='ff-top-anchor'></div>", unsafe_allow_html=True)
 
 st.markdown("Ton souvenir (Entrée lance)")
-st.markdown("<div class='ff-inline-field'>", unsafe_allow_html=True)
-col_q_main, col_x_main = st.columns([24, 2])
-with col_q_main:
+c_input1, c_clear1 = st.columns([16, 1], vertical_alignment="bottom")
+with c_input1:
     q_main = st.text_input(
         "Ton souvenir (Entrée lance)",
         key="q_main",
@@ -949,31 +946,37 @@ with col_q_main:
         on_change=trigger_search,
         placeholder="Ex: homme extraterrestre renaît"
     )
-with col_x_main:
-    if st.button("✕", key="clear_q_main"):
+with c_clear1:
+    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
+    if st.button("✕", key="clear_q_main", help="Vider le souvenir"):
         st.session_state["q_main"] = ""
+        st.session_state["scroll_to_results"] = False
         st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("<div class='ff-search-actions'>", unsafe_allow_html=True)
+if st.button("Trouver", type="primary"):
+    st.session_state["do_search"] = True
+    st.session_state["scroll_to_results"] = True
 st.markdown("</div>", unsafe_allow_html=True)
 
-if st.button("Trouver"):
-    st.session_state["do_search"] = True
-
 st.markdown("Détails (optionnel)")
-st.markdown("<div class='ff-inline-field'>", unsafe_allow_html=True)
-col_q_more, col_x_more = st.columns([24, 2])
-with col_q_more:
+c_input2, c_clear2 = st.columns([16, 1], vertical_alignment="bottom")
+with c_input2:
     q_more = st.text_area(
         "Détails (optionnel)",
         key="q_more",
         label_visibility="collapsed",
-        height=68,
+        height=84,
         placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…"
     )
-with col_x_more:
-    if st.button("✕", key="clear_q_more"):
+with c_clear2:
+    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
+    if st.button("✕", key="clear_q_more", help="Vider les détails"):
         st.session_state["q_more"] = ""
+        st.session_state["scroll_to_results"] = False
         st.rerun()
-st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 selected_genres = []
 selected_year_ranges = []
@@ -1012,12 +1015,13 @@ if st.session_state["do_search"]:
     lang = profile["lang"]
     show_type = profile["show_type"]
 
-    if st.session_state.get("actor_search"):
+    actor_search_value = st.session_state.get("actor_search", "").strip()
+    if actor_search_value:
         show_type = "movie"
 
     q = (st.session_state.get("q_main", "").strip() + " " + st.session_state.get("q_more", "").strip()).strip()
-    if st.session_state.get("actor_search"):
-        q = st.session_state["actor_search"].strip()
+    if actor_search_value:
+        q = actor_search_value
 
     if not q:
         st.warning("Écris au moins une phrase 🙂")
@@ -1026,7 +1030,7 @@ if st.session_state["do_search"]:
     titles = heuristic_titles_from_query(q)
     queries = []
 
-    if ollama_is_up() and not st.session_state.get("actor_search"):
+    if ollama_is_up() and not actor_search_value:
         try:
             pack = ollama_pack(q)
             titles += pack.get("titles", []) or []
@@ -1063,7 +1067,7 @@ if st.session_state["do_search"]:
         except Exception:
             pass
 
-    if (not st.session_state.get("actor_search")) and len(found) < preset["en_if_under"]:
+    if (not actor_search_value) and len(found) < preset["en_if_under"]:
         for kw in queries[:preset["queries_max"]]:
             try:
                 found += search_by_keyword(kw, country, show_type, "en")
@@ -1071,6 +1075,16 @@ if st.session_state["do_search"]:
                 pass
 
     found = merge_results(found)
+
+    if actor_search_value:
+        actor_norm = norm_text(actor_search_value)
+        actor_filtered = []
+        for sh in found:
+            actors_norm = " ".join(norm_text(a) for a in actors_list_from_omdb(sh))
+            if actor_norm and actor_norm in actors_norm:
+                actor_filtered.append(sh)
+        if actor_filtered:
+            found = actor_filtered
 
     allowed_services = set(profile.get("platform_ids", []))
     enriched = []
@@ -1133,22 +1147,31 @@ if st.session_state["do_search"]:
     st.session_state["last_query"] = q
     st.session_state["last_mode"] = mode
 
-    st.markdown("""
-    <script>
-    setTimeout(() => {
-        try {
-            if (document.activeElement) { document.activeElement.blur(); }
-            const el = document.getElementById('ff-results-anchor');
-            if (el) { el.scrollIntoView({behavior:'smooth', block:'start'}); }
-        } catch(e) {}
-    }, 100);
-    </script>
-    """, unsafe_allow_html=True)
 
 # affichage
 results = st.session_state.get("last_results")
 if results is not None:
     st.markdown("<div id='ff-results-anchor'></div>", unsafe_allow_html=True)
+    if st.session_state.get("scroll_to_results"):
+        components.html(
+            """
+            <script>
+            setTimeout(() => {
+                try {
+                    if (window.parent && window.parent.document && window.parent.document.activeElement) {
+                        window.parent.document.activeElement.blur();
+                    }
+                    const el = window.parent.document.getElementById('ff-results-anchor');
+                    if (el) {
+                        el.scrollIntoView({behavior:'smooth', block:'start'});
+                    }
+                } catch(e) {}
+            }, 220);
+            </script>
+            """,
+            height=0,
+        )
+        st.session_state["scroll_to_results"] = False
     st.markdown(f"<div class='ff-muted'>Requête : {st.session_state.get('last_query','')} — Mode : {st.session_state.get('last_mode','')}</div>", unsafe_allow_html=True)
     st.write(f"✅ Résultats : {min(len(results),20)} / {len(results)}")
 
@@ -1238,13 +1261,14 @@ if results is not None:
 
                 actors = actors_list_from_omdb(sh)
                 if actors:
-                    st.markdown("<div class='ff-muted'>Acteurs :</div>", unsafe_allow_html=True)
-                    cols = st.columns(4)
-                    for i, a in enumerate(actors[:8]):
-                        with cols[i % 4]:
-                            if st.button(a, key=f"actor_{stable_id(sh)}_{i}"):
-                                st.session_state["actor_search"] = a
-                                st.session_state["do_search"] = True
-                                st.rerun()
+                    actor_links = []
+                    for a in actors[:8]:
+                        actor_links.append(f"<a href='?actor={quote(a)}' target='_self'>{html.escape(a)}</a>")
+                    st.markdown(
+                        "<div class='ff-inline-actors'><span class='ff-muted'>Acteurs :</span> "
+                        + ", ".join(actor_links)
+                        + "</div>",
+                        unsafe_allow_html=True,
+                    )
 
         st.markdown("</div>", unsafe_allow_html=True)
