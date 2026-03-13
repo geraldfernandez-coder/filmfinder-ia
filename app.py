@@ -251,7 +251,7 @@ def apply_theme():
         position: fixed;
         inset: 0;
         z-index: -2;
-        background-image: linear-gradient(rgba(10,15,30,0.32), rgba(10,15,30,0.28)), url('{bg}');
+        background-image: linear-gradient(rgba(10,15,30,0.20), rgba(10,15,30,0.16)), url('{bg}');
         background-size: cover;
         background-position: center center;
         filter: saturate(1.02);
@@ -291,13 +291,13 @@ def apply_theme():
     .ff-stars .bot {{ color:#d1d5db; }}
     .ff-stars .top {{ color:#fbbf24; position:absolute; overflow:hidden; white-space:nowrap; left:0; top:0; }}
     .ff-stars {{ position:relative; display:inline-block; letter-spacing:2px; font-size:1rem; line-height:1; margin-right:8px; }}
-    .ff-inline-input {{ max-width: 360px; width: 100%; }}
-    .ff-inline-input.ff-textarea {{ max-width: 360px; }}
+    .ff-inline-input {{ max-width: 300px; width: 100%; }}
+    .ff-inline-input.ff-textarea {{ max-width: 300px; }}
     .ff-inline-input .stTextInput, .ff-inline-input .stTextArea {{ margin-bottom:0 !important; }}
     .ff-inline-input [data-testid='stHorizontalBlock'] {{ align-items:center !important; gap:8px !important; }}
     .ff-inline-input [data-baseweb='input'], .ff-inline-input textarea {{ background:rgba(255,255,255,0.96)!important; border-radius:18px!important; border:1px solid rgba(255,255,255,0.82)!important; max-width:100% !important; }}
-    .ff-inline-input textarea {{ min-height: 98px !important; }}
-    .ff-clear button {{ height:40px !important; width:40px !important; min-height:40px !important; border-radius:14px !important; padding:0 !important; }}
+    .ff-inline-input textarea {{ min-height: 112px !important; }}
+    .ff-clear button {{ height:36px !important; width:36px !important; min-height:36px !important; border-radius:12px !important; padding:0 !important; }}
     .ff-accent button {{ background:#ff4f5f !important; color:white !important; border:none !important; border-radius:18px !important; box-shadow: 0 12px 28px rgba(255,79,95,0.28) !important; font-weight:700 !important; }}
     .ff-section-space {{ height:6px; }}
     .ff-scroll-anchor {{ position:relative; top:-16px; }}
@@ -314,9 +314,9 @@ def apply_theme():
         .ff-result-title {{ font-size: 1.65rem; }}
         .ff-title-pill {{ padding: 12px 18px; }}
         .ff-pill {{ padding: 6px 12px; }}
-        .ff-inline-input {{ max-width: calc(100vw - 132px); }}
-        .ff-inline-input.ff-textarea {{ max-width: calc(100vw - 132px); }}
-        .ff-clear button {{ height:38px !important; width:38px !important; min-height:38px !important; border-radius:14px !important; }}
+        .ff-inline-input {{ max-width: 230px; width: 230px; }}
+        .ff-inline-input.ff-textarea {{ max-width: 230px; width: 230px; }}
+        .ff-clear button {{ height:34px !important; width:34px !important; min-height:34px !important; border-radius:12px !important; }}
     }}
     </style>
     """
@@ -753,7 +753,7 @@ if actor_name:
         clear_actor_mode()
 
 st.markdown("<div class='ff-pill'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
-cq1, cx1 = st.columns([5.2, 0.72], vertical_alignment="bottom")
+cq1, cx1 = st.columns([4.0, 0.55], vertical_alignment="center")
 with cq1:
     st.markdown("<div class='ff-inline-input'>", unsafe_allow_html=True)
     st.text_input("Ton souvenir", key="q_main", placeholder="Ex: homme extraterrestre renaît", label_visibility="collapsed", on_change=run_search)
@@ -771,7 +771,7 @@ with cbtn:
     st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<div class='ff-pill'>Détails (optionnel)</div>", unsafe_allow_html=True)
-cq2, cx2 = st.columns([5.2, 0.72], vertical_alignment="top")
+cq2, cx2 = st.columns([4.0, 0.55], vertical_alignment="top")
 with cq2:
     st.markdown("<div class='ff-inline-input ff-textarea'>", unsafe_allow_html=True)
     st.text_area("Détails", key="q_more", placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…", label_visibility="collapsed")
