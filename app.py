@@ -510,12 +510,18 @@ def apply_theme():
         color: white !important;
     }}
 
+    .ff-field-label {{
+        color: #1f2940 !important;
+        font-weight: 600 !important;
+        margin: 2px 0 4px 2px;
+    }}
     .ff-clear-col button {{
-        min-width: 46px !important;
-        width: 46px !important;
-        height: 46px !important;
+        min-width: 40px !important;
+        width: 40px !important;
+        height: 40px !important;
         padding: 0 !important;
-        font-size: 22px !important;
+        font-size: 20px !important;
+        border-radius: 14px !important;
     }}
 
     div[data-testid='stExpander'] details summary p {{ font-weight: 700 !important; color:#1f2940 !important; }}
@@ -543,6 +549,22 @@ def apply_theme():
     @media (max-width: 900px) {{
         .ff-title {{ font-size: 2.5rem; }}
         .main .block-container {{ padding-left: 12px !important; padding-right: 12px !important; }}
+    }}
+    @media (max-width: 520px) {{
+        .ff-title {{ font-size: 2.2rem; }}
+        .main .block-container {{ padding-left: 8px !important; padding-right: 8px !important; }}
+        .ff-clear-col button {{
+            min-width: 34px !important;
+            width: 34px !important;
+            height: 34px !important;
+            font-size: 18px !important;
+            border-radius: 12px !important;
+        }}
+        div[data-testid='stTextInput'] input,
+        div[data-testid='stTextArea'] textarea {{
+            font-size: 0.96rem !important;
+        }}
+        div[data-testid='stTextArea'] textarea {{ min-height: 84px !important; }}
     }}
     </style>
     """
@@ -1034,17 +1056,19 @@ q_more_default = st.session_state.get("last_typed_more", "")
 st.session_state.setdefault("q_main", q_main_default)
 st.session_state.setdefault("q_more", q_more_default)
 
-col1, col2 = st.columns([12, 1])
+st.markdown("<div class='ff-field-label'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
+col1, col2 = st.columns([20, 1], gap="small")
 with col1:
     q_main = st.text_input(
         "Ton souvenir (Entrée lance)",
         key="q_main",
+        label_visibility="collapsed",
         on_change=trigger_search,
         placeholder="Ex: homme extraterrestre renaît",
     )
 with col2:
     st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    if st.button("✕", key="clear_q_main"):
+    if st.button("✕", key="clear_q_main", help="Vider le souvenir"):
         st.session_state["q_main"] = ""
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
@@ -1054,16 +1078,18 @@ with cbtn1:
     if st.button("Trouver", type="primary"):
         st.session_state["do_search"] = True
 
-col3, col4 = st.columns([12, 1])
+st.markdown("<div class='ff-field-label'>Détails (optionnel)</div>", unsafe_allow_html=True)
+col3, col4 = st.columns([20, 1], gap="small")
 with col3:
     q_more = st.text_area(
         "Détails (optionnel)",
         key="q_more",
+        label_visibility="collapsed",
         placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…",
     )
 with col4:
     st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    if st.button("✕", key="clear_q_more"):
+    if st.button("✕", key="clear_q_more", help="Vider les détails"):
         st.session_state["q_more"] = ""
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
