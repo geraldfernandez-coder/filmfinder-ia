@@ -534,4 +534,511 @@ def tnt_find_airings(title_variants, limit=2):
         for k in keys:
             close = difflib.get_close_matches(k, all_keys, n=2, cutoff=0.92)
             for ck in close:
-                matches += idx.get(ck
+                matches += idx.get(ck, [])
+
+    uniq = []
+    seen = set()
+    for s, e, ch in matches:
+        key = (s, ch)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((s, e, ch))
+    uniq.sort(key=lambda x: x[0])
+
+    out = []
+    for s, e, ch in uniq[:limit]:
+        try:
+            sdt = datetime.fromisoformat(s)
+            edt = datetime.fromisoformat(e)
+            out.append({
+                "channel": channel_names.get(ch, ch),
+                "start": sdt.strftime("%d/%m %H:%M"),
+                "stop": edt.strftime("%H:%M"),
+            })
+        except Exception:
+            continue
+    return out
+
+
+# ================== SEARCH ==================
+def merge_results(items):
+    merged = {}
+    for sh in items:
+        merged[stable_id(sh)] = sh
+    return list(merged.values())
+
+def extract_keywords(text: str, max_words: int = 10) -> str:
+    words = re.findall(r"[a-zA-ZÀ-ÿ0-9']+", text.lower())
+    words = [w for w in words if len(w) >= 4 and w not in STOPWORDS]
+    out = []
+    for w in words:
+        if w not in out:
+            out.append(w)
+        if len(out) >= max_words:
+            break
+    return " ".join(out) if out else text.strip()
+
+def heuristic_titles_from_query(q: str):
+    nq = norm_text(q)
+    titles = []
+    time_loop = any(x in nq for x in ["boucle", "revit", "revivre", "meme journee", "même journée", "rena", "ressusc", "time loop", "loop"])
+    tom = "tom cruise" in nq
+    alien = any(x in nq for x in ["extraterrestre", "alien"])
+    if time_loop:
+        titles += ["Edge of Tomorrow", "Un jour sans fin", "Happy Death Day", "Palm Springs"]
+    if tom:
+        titles.insert(0, "Edge of Tomorrow")
+        titles += ["Live Die Repeat"]
+    if alien and time_loop and "Edge of Tomorrow" not in titles:
+        titles.insert(0, "Edge of Tomorrow")
+    out = []
+    for t in titles:
+        if t not in out:
+            out.append(t)
+    return out
+
+def relevance_score(sh: dict, q: str, actor_hint: str = "") -> float:
+    hay = norm_text((sh.get("title") or "") + " " + (sh.get("overview") or ""))
+    qn = norm_text(q)
+
+    words = [w for w in qn.split() if len(w) >= 4 and w not in STOPWORDS]
+    score = 0.0
+    for w in set(words):
+        if w in hay:
+            score += 1.0
+
+    # boucle temporelle
+    if any(x in qn for x in ["boucle", "revit", "revivre", "meme journee", "même journée", "ressusc", "rena"]):
+        if any(x in hay for x in ["loop", "time loop", "revit", "revivre", "ressusc", "rena", "day repeats", "repeat the day"]):
+            score += 3.0
+
+    # extraterrestre / alien
+    if any(x in qn for x in ["extraterrestre", "alien"]):
+        if any(x in hay for x in ["alien", "extraterrestre", "invasion", "space", "armée extraterrestre", "military operation against aliens"]):
+            score += 2.2
+
+    # acteur
+    if actor_hint:
+        actors = " ".join([norm_text(a) for a in actors_list_from_omdb(sh)])
+        if actor_hint in actors:
+            score += 4.0
+
+    # titre exact edge of tomorrow
+    title_n = norm_text(sh.get("title", ""))
+    if "edge of tomorrow" in title_n or "live die repeat" in title_n:
+        if any(x in qn for x in ["tom cruise", "extraterrestre", "revit", "rena", "ressusc", "journee", "journée", "loop"]):
+            score += 4.0
+
+    return score
+
+
+# ================== STATE ==================
+st.session_state.setdefault("entered", False)
+st.session_state.setdefault("page", "Accueil")
+st.session_state.setdefault("do_search", False)
+st.session_state.setdefault("last_results", None)
+st.session_state.setdefault("last_query", "")
+st.session_state.setdefault("last_mode", "Normal")
+st.session_state.setdefault("actor_search", "")
+st.session_state.setdefault("sort_mode", "Pertinence")
+
+
+# ================== SIDEBAR ==================
+with st.sidebar:
+    st.markdown("## FilmFinder IA")
+    if st.session_state["entered"]:
+        st.radio("Menu", ["Recherche", "Profil"], key="page")
+    else:
+        st.caption("Accueil (début uniquement)")
+
+
+# ================== ACCUEIL ==================
+if st.session_state["page"] == "Accueil":
+    st.markdown("# FilmFinder IA")
+    st.caption("Souvenir flou → titres probables → où regarder.")
+
+    if not RAPIDAPI_KEY:
+        st.error("RAPIDAPI_KEY manquante dans .env (RapidAPI).")
+        st.stop()
+
+    with st.form("signup_form"):
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            country = st.selectbox("Pays", ["fr", "be", "ch", "gb", "us"], index=["fr","be","ch","gb","us"].index(profile.get("country","fr")))
+        with c2:
+            lang = st.selectbox("Langue", ["fr", "en"], index=["fr","en"].index(profile.get("lang","fr")))
+        with c3:
+            typ = st.selectbox("Type", ["Film", "Série"], index=0 if profile.get("show_type","movie")=="movie" else 1)
+        with c4:
+            show_elsewhere = st.checkbox("Ailleurs", value=bool(profile.get("show_elsewhere", False)))
+
+        services = get_services(country, lang)
+        name_to_id = {(s.get("name") or s.get("id")): s.get("id") for s in services if (s.get("name") or s.get("id")) and s.get("id")}
+        id_to_name = {v: k for k, v in name_to_id.items()}
+        default_names = [id_to_name[i] for i in profile.get("platform_ids", []) if i in id_to_name]
+        chosen_names = st.multiselect("Tes plateformes", options=sorted(name_to_id.keys()), default=sorted(set(default_names)))
+        platform_ids = [name_to_id[n] for n in chosen_names]
+
+        enter_btn = st.form_submit_button("Entrer")
+
+    if enter_btn:
+        if not platform_ids:
+            st.warning("Coche au moins 1 plateforme 🙂")
+        else:
+            profile = {
+                "pseudo": "",
+                "country": country,
+                "lang": lang,
+                "show_type": "movie" if typ == "Film" else "series",
+                "platform_ids": platform_ids,
+                "show_elsewhere": bool(show_elsewhere),
+            }
+            save_profile(profile)
+            st.session_state["entered"] = True
+            st.session_state["page"] = "Recherche"
+            st.rerun()
+    st.stop()
+
+
+# ================== PROFIL ==================
+if st.session_state["page"] == "Profil":
+    st.markdown("## Profil")
+
+    with st.form("profile_form"):
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            country = st.selectbox("Pays", ["fr", "be", "ch", "gb", "us"], index=["fr","be","ch","gb","us"].index(profile.get("country","fr")))
+        with c2:
+            lang = st.selectbox("Langue", ["fr", "en"], index=["fr","en"].index(profile.get("lang","fr")))
+        with c3:
+            typ = st.selectbox("Type", ["Film", "Série"], index=0 if profile.get("show_type","movie")=="movie" else 1)
+        with c4:
+            show_elsewhere = st.checkbox("Ailleurs", value=bool(profile.get("show_elsewhere", False)))
+
+        services = get_services(country, lang)
+        name_to_id = {(s.get("name") or s.get("id")): s.get("id") for s in services if (s.get("name") or s.get("id")) and s.get("id")}
+        id_to_name = {v: k for k, v in name_to_id.items()}
+        default_names = [id_to_name[i] for i in profile.get("platform_ids", []) if i in id_to_name]
+        chosen_names = st.multiselect("Tes plateformes", options=sorted(name_to_id.keys()), default=sorted(set(default_names)))
+        platform_ids = [name_to_id[n] for n in chosen_names]
+
+        ok_btn = st.form_submit_button("✅ Enregistrer")
+
+    if ok_btn:
+        if not platform_ids:
+            st.warning("Coche au moins 1 plateforme 🙂")
+        else:
+            profile = {
+                "pseudo": "",
+                "country": country,
+                "lang": lang,
+                "show_type": "movie" if typ == "Film" else "series",
+                "platform_ids": platform_ids,
+                "show_elsewhere": bool(show_elsewhere),
+            }
+            save_profile(profile)
+            st.success("Profil enregistré.")
+            st.rerun()
+
+    st.stop()
+
+
+# ================== RECHERCHE ==================
+st.markdown("# Recherche")
+
+if not profile.get("platform_ids"):
+    st.warning("Crée ton profil avant de chercher.")
+    st.stop()
+
+MODE_PRESETS = {
+    "Rapide":  {"titles_max": 2, "queries_max": 2, "en_if_under": 6,  "pool": 40,  "omdb_top": 12},
+    "Normal":  {"titles_max": 4, "queries_max": 4, "en_if_under": 8,  "pool": 70,  "omdb_top": 18},
+    "Profond": {"titles_max": 7, "queries_max": 7, "en_if_under": 999, "pool": 120, "omdb_top": 25},
+}
+mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1)
+preset = MODE_PRESETS[mode]
+
+if st.session_state.get("actor_search"):
+    actor = st.session_state["actor_search"]
+    st.markdown(f"<div class='ff-muted'>Recherche acteur : <b>{actor}</b> — tri par note</div>", unsafe_allow_html=True)
+    st.session_state["sort_mode"] = "Note (haute)"
+    if st.button("⬅️ Retour recherche normale"):
+        st.session_state["actor_search"] = ""
+        st.session_state["last_results"] = None
+        st.rerun()
+
+def trigger_search():
+    st.session_state["do_search"] = True
+
+# panneau recherche encadré
+st.markdown("<div class='ff-panel'>", unsafe_allow_html=True)
+
+c_in, c_btn = st.columns([4, 1])
+with c_in:
+    q_main = st.text_input("Ton souvenir (Entrée lance)", key="q_main", on_change=trigger_search)
+with c_btn:
+    st.write("")
+    st.write("")
+    if st.button("Trouver"):
+        st.session_state["do_search"] = True
+
+q_more = st.text_area(
+    "Détails (optionnel)",
+    key="q_more",
+    height=68,
+    placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…"
+)
+
+with st.expander("Filtres", expanded=False):
+    genre_choices = [
+        "Action","Aventure","Animation","Comédie","Crime","Documentaire","Drame","Famille","Fantasy",
+        "Horreur","Mystère","Romance","Science-fiction","Thriller","Guerre","Western"
+    ]
+    include_genres = st.multiselect("Genre", genre_choices, default=[])
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        gore = st.checkbox("Gore/violent", value=False)
+    with c2:
+        sex = st.checkbox("Sexe explicite", value=False)
+    with c3:
+        adult = st.checkbox("Adulte", value=False)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+sort_mode = st.selectbox(
+    "Trier par",
+    ["Pertinence", "Année (récent)", "Note (haute)"],
+    index=["Pertinence", "Année (récent)", "Note (haute)"].index(st.session_state.get("sort_mode", "Pertinence"))
+)
+st.session_state["sort_mode"] = sort_mode
+
+only_my_apps = st.checkbox("Uniquement sur mes applis", value=False)
+
+# recherche
+if st.session_state["do_search"]:
+    st.session_state["do_search"] = False
+
+    country = profile["country"]
+    lang = profile["lang"]
+    show_type = profile["show_type"]
+
+    if st.session_state.get("actor_search"):
+        show_type = "movie"
+
+    q = (q_main.strip() + " " + q_more.strip()).strip()
+    if st.session_state.get("actor_search"):
+        q = st.session_state["actor_search"].strip()
+
+    if not q:
+        st.warning("Écris au moins une phrase 🙂")
+        st.stop()
+
+    titles = heuristic_titles_from_query(q)
+    queries = []
+    if ollama_is_up() and not st.session_state.get("actor_search"):
+        try:
+            pack = ollama_pack(q)
+            titles += pack.get("titles", []) or []
+            queries = pack.get("queries", []) or []
+        except Exception:
+            pass
+
+    if not queries:
+        queries = [extract_keywords(q), q]
+
+    # acteur hint
+    qn = norm_text(q)
+    actor_hint = ""
+    if "tom cruise" in qn:
+        actor_hint = "tom cruise"
+    else:
+        bigrams = re.findall(r"[a-z]+ [a-z]+", qn)
+        if bigrams:
+            actor_hint = bigrams[0]
+
+    # dedupe
+    titles = [x for i, x in enumerate(titles) if x and x not in titles[:i]]
+    queries = [x for i, x in enumerate(queries) if x and x not in queries[:i]]
+
+    found = []
+
+    for t in titles[:preset["titles_max"]]:
+        try:
+            found += search_by_title(t, country, show_type, lang)
+        except Exception:
+            pass
+
+    for kw in queries[:preset["queries_max"]]:
+        try:
+            found += search_by_keyword(kw, country, show_type, lang)
+        except Exception:
+            pass
+
+    if (not st.session_state.get("actor_search")) and len(found) < preset["en_if_under"]:
+        for kw in queries[:preset["queries_max"]]:
+            try:
+                found += search_by_keyword(kw, country, show_type, "en")
+            except Exception:
+                pass
+
+    found = merge_results(found)
+
+    allowed_services = set(profile.get("platform_ids", []))
+    enriched = []
+
+    for i, sh in enumerate(found):
+        opts_all = ((sh.get("streamingOptions") or {}).get(country) or [])
+        opts_all = dedupe_streaming_options(opts_all)
+        opts_mine = [o for o in opts_all if ((o.get("service") or {}).get("id") in allowed_services)]
+        opts_mine = dedupe_streaming_options(opts_mine)
+        is_mine = 1 if opts_mine else 0
+
+        rel = relevance_score(sh, q, actor_hint=actor_hint)
+        rel += 0.30 * is_mine  # tri secondaire dispo
+
+        year = sh.get("releaseYear") or sh.get("firstAirYear") or 0
+        try:
+            year = int(year) if year else 0
+        except Exception:
+            year = 0
+
+        score100 = None
+        sources = ""
+        if i < preset["omdb_top"]:
+            score100, sources = critic_score_and_sources(sh)
+        else:
+            if isinstance(sh.get("rating"), (int, float)):
+                score100 = float(sh["rating"])
+                sources = f"Score {int(score100)}/100"
+
+        enriched.append({
+            "show": sh,
+            "rel": rel,
+            "year": year,
+            "score100": score100,
+            "sources": sources,
+            "is_mine": is_mine,
+        })
+
+    if only_my_apps:
+        keep = [x for x in enriched if x["is_mine"] == 1]
+        enriched = keep if keep else enriched
+
+    if sort_mode == "Pertinence":
+        enriched.sort(key=lambda x: (x["rel"], x["is_mine"]), reverse=True)
+    elif sort_mode == "Année (récent)":
+        enriched.sort(key=lambda x: (x["year"], x["is_mine"]), reverse=True)
+    else:
+        enriched.sort(key=lambda x: ((x["score100"] is not None), (x["score100"] or -1), x["is_mine"]), reverse=True)
+
+    st.session_state["last_results"] = enriched[:preset["pool"]]
+    st.session_state["last_query"] = q
+    st.session_state["last_mode"] = mode
+
+# affichage
+results = st.session_state.get("last_results")
+if results is not None:
+    st.markdown(f"<div class='ff-muted'>Requête : {st.session_state.get('last_query','')} — Mode : {st.session_state.get('last_mode','')}</div>", unsafe_allow_html=True)
+    st.write(f"✅ Résultats : {min(len(results),20)} / {len(results)}")
+
+    country = profile["country"]
+    allowed_services = set(profile.get("platform_ids", []))
+    show_elsewhere = bool(profile.get("show_elsewhere", False))
+
+    for idx, item in enumerate(results[:20]):
+        sh = item["show"]
+        title = sh.get("title", "Sans titre")
+        year = item["year"]
+        score100 = item["score100"]
+        sources = item["sources"]
+        poster = get_poster_url(sh)
+        overview = sh.get("overview", "")
+
+        opts_all = ((sh.get("streamingOptions") or {}).get(country) or [])
+        opts_all = dedupe_streaming_options(opts_all)
+        opts_mine = [o for o in opts_all if ((o.get("service") or {}).get("id") in allowed_services)]
+        opts_mine = dedupe_streaming_options(opts_mine)
+
+        # pays + drapeau
+        ctxt = country_from_omdb(sh) if OMDB_API_KEY else ""
+        iso = iso2_from_country_text(ctxt) if ctxt else ""
+        flag = flag_from_iso2(iso) if iso else ""
+        country_label = ctxt.split(",")[0].strip() if ctxt else ""
+
+        # TNT auto si trouvé seulement
+        airings = []
+        if idx < 10:
+            title_variants = [title]
+            if sh.get("originalTitle"):
+                title_variants.append(sh["originalTitle"])
+            airings = tnt_find_airings(title_variants, limit=2)
+
+        st.markdown("<div class='ff-result'>", unsafe_allow_html=True)
+
+        c_img, c_txt = st.columns([1, 3])
+        with c_img:
+            if poster:
+                st.image(poster, width=140)
+
+        with c_txt:
+            st.markdown(f"### {title} ({year if year else ''})")
+
+            star = stars_html(score100)
+            if star:
+                score5 = None if score100 is None else round(float(score100) / 20.0, 1)
+                label = "" if score5 is None else f"<span class='ff-muted' style='margin-left:8px'>({score5}/5)</span>"
+                fl = f"<span class='ff-muted' style='margin-left:10px'>{flag} {country_label}</span>" if (flag or country_label) else ""
+                st.markdown(f"{star}{label}{fl}", unsafe_allow_html=True)
+
+            if opts_mine:
+                st.markdown("<div class='ff-meta'>✅ Dispo sur tes applis</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<div class='ff-meta'>❌ Pas dispo sur tes applis</div>", unsafe_allow_html=True)
+
+            # liens AVANT détails
+            if opts_mine:
+                st.markdown("<div class='ff-links'>", unsafe_allow_html=True)
+                for o in opts_mine[:3]:
+                    s = (o.get("service") or {})
+                    name = s.get("name", s.get("id", "service"))
+                    typ = o.get("type", "")
+                    link = o.get("link") or o.get("videoLink")
+                    if link:
+                        st.markdown(f"- **{name}** ({typ}) → {link}")
+                st.markdown("</div>", unsafe_allow_html=True)
+            elif show_elsewhere and opts_all:
+                st.markdown("<div class='ff-links'>", unsafe_allow_html=True)
+                for o in opts_all[:3]:
+                    s = (o.get("service") or {})
+                    name = s.get("name", s.get("id", "service"))
+                    typ = o.get("type", "")
+                    link = o.get("link") or o.get("videoLink")
+                    if link:
+                        st.markdown(f"- **{name}** ({typ}) → {link}")
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            with st.expander("Détails", expanded=False):
+                if airings:
+                    txt = "TNT : " + " · ".join([f"{a['channel']} {a['start']}-{a['stop']}" for a in airings])
+                    st.markdown(f"<div class='ff-muted'>{txt}</div>", unsafe_allow_html=True)
+
+                if sources:
+                    st.markdown(f"<div class='ff-muted'>{sources}</div>", unsafe_allow_html=True)
+
+                if overview:
+                    st.write(overview)
+
+                actors = actors_list_from_omdb(sh)
+                if actors:
+                    st.markdown("<div class='ff-muted'>Acteurs :</div>", unsafe_allow_html=True)
+                    cols = st.columns(4)
+                    for i, a in enumerate(actors[:8]):
+                        with cols[i % 4]:
+                            if st.button(a, key=f"actor_{stable_id(sh)}_{i}"):
+                                st.session_state["actor_search"] = a
+                                st.session_state["do_search"] = True
+                                st.rerun()
+
+        st.markdown("</div>", unsafe_allow_html=True)
