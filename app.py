@@ -252,15 +252,15 @@ def apply_theme():
     }}
 
     
+    html, body, .stApp, [data-testid="stAppViewContainer"] {
+        filter: saturate(1.02);
+    }
     .ff-bubble, .ff-result-bubble, .ff-shell-title {
-        border-radius: 30px;
-        box-shadow: 0 14px 34px rgba(0,0,0,0.08);
+        background: rgba(255,255,255,0.88);
+        backdrop-filter: blur(10px);
     }
     .ff-result-bubble {
-        padding: 16px 18px 14px 18px;
-    }
-    .stButton > button {
-        border-radius: 999px !important;
+        border-left: 6px solid rgba(255,255,255,0.65);
     }
     
 
