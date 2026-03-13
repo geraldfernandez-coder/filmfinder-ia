@@ -29,7 +29,7 @@ BG_DIR = APP_DIR / "bg"
 st.set_page_config(page_title="FilmFinder IA", layout="centered")
 
 # ================== THEME ==================
-VARIANT = "C"
+VARIANT = "A"
 THEMES = {
     "A": {
         "name": "Bulles Messenger",
@@ -536,6 +536,18 @@ def apply_theme():
         padding: 8px 12px 12px 12px;
         margin-bottom: 14px;
     }}
+    div[data-testid='stVerticalBlockBorderWrapper'] {{
+        background: {THEME['bubble_bg']} !important;
+        border: 1px solid {THEME['bubble_border']} !important;
+        border-radius: {THEME['bubble_radius']} !important;
+        box-shadow: {THEME['bubble_shadow']} !important;
+        backdrop-filter: blur(12px);
+        padding: 10px 10px 8px 10px !important;
+        margin: 0 0 14px 0 !important;
+    }}
+    div[data-testid='stVerticalBlockBorderWrapper'] > div {{
+        background: transparent !important;
+    }}
     .ff-preview-note {{
         background: rgba(255, 245, 204, 0.82);
         color: #5a4606;
@@ -1019,7 +1031,6 @@ if st.session_state["page"] == "Profil":
 
 # ================== SEARCH ==================
 profile = load_profile()
-st.markdown("<h1 class='ff-title' style='font-size:2.8rem'>Recherche</h1>", unsafe_allow_html=True)
 
 if not profile.get("platform_ids"):
     st.warning("Crée ton profil avant de chercher.")
@@ -1031,23 +1042,6 @@ MODE_PRESETS = {
     "Profond": {"titles_max": 7, "queries_max": 7, "en_if_under": 999, "pool": 120, "omdb_top": 25},
 }
 
-mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1)
-preset = MODE_PRESETS[mode]
-
-if st.session_state.get("actor_search"):
-    actor = st.session_state["actor_search"]
-    st.markdown(f"<div class='ff-inline-note'>Recherche acteur : <b>{escape(actor)}</b> — recherche automatique des films de cet acteur.</div>", unsafe_allow_html=True)
-    if st.button("Retour recherche normale"):
-        st.session_state["actor_search"] = ""
-        st.session_state["last_results"] = None
-        st.session_state["api_preview_notice"] = ""
-        st.session_state["api_error_notice"] = ""
-        try:
-            st.query_params.clear()
-        except Exception:
-            pass
-        st.rerun()
-
 def trigger_search():
     st.session_state["do_search"] = True
 
@@ -1056,66 +1050,86 @@ q_more_default = st.session_state.get("last_typed_more", "")
 st.session_state.setdefault("q_main", q_main_default)
 st.session_state.setdefault("q_more", q_more_default)
 
-st.markdown("<div class='ff-field-label'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
-col1, col2 = st.columns([20, 1], gap="small")
-with col1:
-    q_main = st.text_input(
-        "Ton souvenir (Entrée lance)",
-        key="q_main",
-        label_visibility="collapsed",
-        on_change=trigger_search,
-        placeholder="Ex: homme extraterrestre renaît",
+search_shell = st.container(border=True)
+with search_shell:
+    st.markdown("<h1 class='ff-title' style='font-size:2.8rem'>Recherche</h1>", unsafe_allow_html=True)
+    mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1)
+    preset = MODE_PRESETS[mode]
+
+    if st.session_state.get("actor_search"):
+        actor = st.session_state["actor_search"]
+        st.markdown(f"<div class='ff-inline-note'>Recherche acteur : <b>{escape(actor)}</b> — recherche automatique des films de cet acteur.</div>", unsafe_allow_html=True)
+        if st.button("Retour recherche normale"):
+            st.session_state["actor_search"] = ""
+            st.session_state["last_results"] = None
+            st.session_state["api_preview_notice"] = ""
+            st.session_state["api_error_notice"] = ""
+            try:
+                st.query_params.clear()
+            except Exception:
+                pass
+            st.rerun()
+
+    st.markdown("<div class='ff-field-label'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
+    col1, col2 = st.columns([14, 1], gap="small")
+    with col1:
+        q_main = st.text_input(
+            "Ton souvenir (Entrée lance)",
+            key="q_main",
+            label_visibility="collapsed",
+            on_change=trigger_search,
+            placeholder="Ex: homme extraterrestre renaît",
+        )
+    with col2:
+        st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
+        if st.button("✕", key="clear_q_main", help="Vider le souvenir"):
+            st.session_state["q_main"] = ""
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    cbtn1, cbtn2 = st.columns([1, 5])
+    with cbtn1:
+        if st.button("Trouver", type="primary"):
+            st.session_state["do_search"] = True
+
+    st.markdown("<div class='ff-field-label'>Détails (optionnel)</div>", unsafe_allow_html=True)
+    col3, col4 = st.columns([14, 1], gap="small")
+    with col3:
+        q_more = st.text_area(
+            "Détails (optionnel)",
+            key="q_more",
+            label_visibility="collapsed",
+            placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…",
+        )
+    with col4:
+        st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
+        if st.button("✕", key="clear_q_more", help="Vider les détails"):
+            st.session_state["q_more"] = ""
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with st.expander("Filtres", expanded=False):
+        left, right = st.columns(2)
+        selected_genres = []
+        selected_years = []
+        with left:
+            st.caption("Genres")
+            for g in GENRES:
+                if st.checkbox(g, key=f"genre_{g}"):
+                    selected_genres.append(g)
+        with right:
+            st.caption("Années")
+            for y in YEARS:
+                if st.checkbox(y, key=f"year_{y}"):
+                    selected_years.append(int(y))
+
+    sort_mode = st.selectbox(
+        "Trier par",
+        ["Pertinence", "Année (récent)", "Note (haute)"],
+        index=["Pertinence", "Année (récent)", "Note (haute)"].index(st.session_state.get("sort_mode", "Pertinence")),
     )
-with col2:
-    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    if st.button("✕", key="clear_q_main", help="Vider le souvenir"):
-        st.session_state["q_main"] = ""
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-cbtn1, cbtn2 = st.columns([1, 5])
-with cbtn1:
-    if st.button("Trouver", type="primary"):
-        st.session_state["do_search"] = True
-
-st.markdown("<div class='ff-field-label'>Détails (optionnel)</div>", unsafe_allow_html=True)
-col3, col4 = st.columns([20, 1], gap="small")
-with col3:
-    q_more = st.text_area(
-        "Détails (optionnel)",
-        key="q_more",
-        label_visibility="collapsed",
-        placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…",
-    )
-with col4:
-    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    if st.button("✕", key="clear_q_more", help="Vider les détails"):
-        st.session_state["q_more"] = ""
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-with st.expander("Filtres", expanded=False):
-    left, right = st.columns(2)
-    selected_genres = []
-    selected_years = []
-    with left:
-        st.caption("Genres")
-        for g in GENRES:
-            if st.checkbox(g, key=f"genre_{g}"):
-                selected_genres.append(g)
-    with right:
-        st.caption("Années")
-        for y in YEARS:
-            if st.checkbox(y, key=f"year_{y}"):
-                selected_years.append(int(y))
-
-sort_mode = st.selectbox(
-    "Trier par",
-    ["Pertinence", "Année (récent)", "Note (haute)"],
-    index=["Pertinence", "Année (récent)", "Note (haute)"].index(st.session_state.get("sort_mode", "Pertinence")),
-)
-st.session_state["sort_mode"] = sort_mode
-only_my_apps = st.checkbox("Uniquement sur mes applis", value=False)
+    st.session_state["sort_mode"] = sort_mode
+    only_my_apps = st.checkbox("Uniquement sur mes applis", value=False)
 
 # ================== SEARCH ACTION ==================
 if st.session_state["do_search"]:
