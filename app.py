@@ -353,9 +353,14 @@ def apply_theme():
         box-shadow: 0 8px 18px rgba(20, 24, 35, 0.06) !important;
     }}
     div[data-testid='stTextInput'],
-    div[data-testid='stTextArea'] {{
-        max-width: 320px;
-    }}
+    div[data-testid='stTextArea'] {
+        max-width: none !important;
+        width: 100% !important;
+    }
+    div[data-testid='stTextInput'] > div,
+    div[data-testid='stTextArea'] > div {
+        width: 100% !important;
+    }
     div[data-testid='stTextInput'] input,
     div[data-testid='stTextArea'] textarea {{
         color: #17233b !important;
@@ -464,10 +469,11 @@ def apply_theme():
             gap: 8px !important;
         }}
         div[data-testid='stTextInput'],
-        div[data-testid='stTextArea'] {{
-            max-width: 270px !important;
+        div[data-testid='stTextArea'] {
+            max-width: none !important;
+            width: 100% !important;
             min-width: 0 !important;
-        }}
+        }
         .ff-clear-col button {{
             min-width: 30px !important;
             width: 30px !important;
@@ -923,7 +929,7 @@ if actor_name:
         clear_actor_mode()
 
 st.markdown("<div class='ff-pill'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
-col1, col2, _sp1 = st.columns([6.2, 0.85, 4.95], gap="small")
+col1, col2, _sp1 = st.columns([5.35, 0.82, 5.83], gap="small")
 with col1:
     st.text_input(
         "Ton souvenir (Entrée lance)",
@@ -942,7 +948,7 @@ if st.button("Trouver", type="primary"):
     run_search()
 
 st.markdown("<div class='ff-pill'>Détails (optionnel)</div>", unsafe_allow_html=True)
-col3, col4, _sp2 = st.columns([6.2, 0.85, 4.95], gap="small")
+col3, col4, _sp2 = st.columns([5.35, 0.82, 5.83], gap="small")
 with col3:
     st.text_area(
         "Détails (optionnel)",
