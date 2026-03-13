@@ -336,19 +336,45 @@ def parse_year_value(show):
         return 0
 
 # ================== BACKGROUND ==================
+
 def list_bg_images():
-    if not BG_DIR.exists() or not BG_DIR.is_dir():
-        return []
+    env_dir = os.getenv("FILMFINDER_BG_DIR", "").strip()
+    candidate_dirs = []
+    if env_dir:
+        candidate_dirs.append(Path(env_dir))
+    candidate_dirs.extend([
+        BG_DIR,
+        APP_DIR / "BG",
+        Path.cwd() / "bg",
+        Path.cwd() / "BG",
+        APP_DIR.parent / "bg",
+        APP_DIR.parent / "BG",
+        Path(r"C:\Users\TEST\FilmFinderIA\bg"),
+    ])
+
     files = []
-    for p in BG_DIR.iterdir():
-        if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
-            files.append(p)
-    return sorted(files)
+    seen = set()
+    for d in candidate_dirs:
+        try:
+            if not d.exists() or not d.is_dir():
+                continue
+            for p in sorted(d.rglob("*")):
+                if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
+                    key = str(p.resolve())
+                    if key not in seen:
+                        seen.add(key)
+                        files.append(p)
+        except Exception:
+            continue
+    return files
 
 def pick_bg_image():
     bg_files = list_bg_images()
+    st.session_state["bg_count"] = len(bg_files)
     if not bg_files:
+        st.session_state["bg_image_name"] = ""
         return None
+
     saved_name = st.session_state.get("bg_image_name", "")
     chosen = None
     if saved_name:
@@ -426,15 +452,15 @@ def apply_theme():
     bg_path = pick_bg_image()
     bg_uri = file_to_data_uri(bg_path) if bg_path else demo_bg_data_uri()
     if bg_uri:
-        background_rule = f"background-image: {THEME['page_scrim']}, url('{bg_uri}'); background-size: cover; background-position: center center;"
+        background_rule = f"background-image: linear-gradient(rgba(18,23,34,0.28), rgba(18,23,34,0.22)), url('{bg_uri}'); background-size: cover; background-position: center center;"
     else:
-        background_rule = f"background: {THEME['page_scrim']};"
+        background_rule = "background: linear-gradient(rgba(18,23,34,0.28), rgba(18,23,34,0.22));"
 
     css = f"""
     <style>
     html, body, .stApp, [data-testid='stAppViewContainer'] {{
         background: transparent !important;
-        color: #1f2940 !important;
+        color: #17233b !important;
     }}
     [data-testid='stAppViewContainer']::before {{
         content: '';
@@ -442,7 +468,7 @@ def apply_theme():
         inset: 0;
         z-index: -2;
         {background_rule}
-        filter: saturate(1.03);
+        filter: saturate(1.04);
     }}
     [data-testid='stHeader'] {{
         background: rgba(0,0,0,0) !important;
@@ -453,62 +479,80 @@ def apply_theme():
         padding-bottom: 90px !important;
         background: transparent !important;
     }}
+
+    .ff-title-pill,
+    .ff-pill,
+    .ff-inline-note,
+    .ff-radio-shell,
+    .ff-checkbox-shell {{
+        display: inline-block;
+        background: rgba(255,255,255,0.94);
+        border: 1px solid rgba(255,255,255,0.82);
+        border-radius: 22px;
+        box-shadow: 0 12px 30px rgba(19, 24, 38, 0.10);
+        backdrop-filter: blur(12px);
+    }}
+    .ff-title-pill {{
+        padding: 14px 18px;
+        margin: 0 0 12px 0;
+    }}
     .ff-title {{
-        margin: 0 0 6px 0;
-        color: #1f2940;
+        margin: 0;
+        color: #17233b;
         font-size: 3rem;
         line-height: 1;
         font-weight: 800;
     }}
     .ff-subtitle {{
-        color: rgba(31,41,64,0.64);
-        margin-bottom: 14px;
+        display: inline-block;
+        padding: 10px 14px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.80);
+        color: rgba(23,35,59,0.82);
+        margin: 0 0 14px 0;
+        box-shadow: 0 10px 22px rgba(19,24,38,0.08);
+        backdrop-filter: blur(10px);
     }}
-    .ff-bubble, div[data-testid='stExpander'] {{
-        background: {THEME['bubble_bg']} !important;
-        border: 1px solid {THEME['bubble_border']} !important;
-        border-radius: {THEME['bubble_radius']} !important;
-        box-shadow: {THEME['bubble_shadow']} !important;
-        backdrop-filter: blur(12px);
+    .ff-pill {{
+        padding: 8px 14px;
+        margin: 10px 0 8px 0;
+        color: #17233b;
+        font-weight: 700;
     }}
+    .ff-inline-note {{
+        padding: 11px 14px;
+        margin: 6px 0 12px 0;
+        color: rgba(23,35,59,0.88);
+    }}
+
     .ff-card {{
-        background: {THEME['card_bg']};
-        border: 1px solid {THEME['card_border']};
-        border-radius: calc({THEME['bubble_radius']} + 2px);
-        box-shadow: {THEME['bubble_shadow']};
+        background: rgba(255,255,255,0.96);
+        border: 1px solid rgba(255,255,255,0.84);
+        border-radius: 26px;
+        box-shadow: 0 12px 30px rgba(19, 24, 38, 0.10);
         padding: 16px 18px;
         backdrop-filter: blur(14px);
     }}
-    .ff-inline-note {{
-        background: {THEME['bubble_bg']};
-        border: 1px solid {THEME['bubble_border']};
-        border-radius: 16px;
-        padding: 10px 14px;
-        box-shadow: {THEME['bubble_shadow']};
-        margin: 8px 0 10px 0;
-        color: rgba(31,41,64,0.82);
-    }}
-    .ff-muted {{ color: rgba(31,41,64,0.70); font-size: 0.95rem; }}
     .ff-availability {{
         display: inline-block;
         margin: 10px 0 10px 0;
         padding: 8px 12px;
         border-radius: 999px;
-        background: rgba(255,255,255,0.92);
-        border: 1px solid rgba(210,216,226,0.84);
+        background: rgba(255,255,255,0.96);
+        border: 1px solid rgba(210,216,226,0.90);
         font-weight: 600;
     }}
     .ff-links {{ margin: 6px 0 10px 0; display:flex; flex-wrap: wrap; gap: 8px; }}
     .ff-chip-link {{
         display:inline-block; padding:7px 11px; border-radius:999px;
         text-decoration:none !important; color:#17365d !important; font-weight:600;
-        background: rgba(255,255,255,0.92); border:1px solid rgba(210,216,226,0.85);
+        background: rgba(255,255,255,0.96); border:1px solid rgba(210,216,226,0.90);
     }}
     .ff-chip-link:hover {{ background: {THEME['accent_soft']}; }}
     .ff-actorline a {{ color:#0b57d0 !important; text-decoration:none !important; font-weight:600; }}
     .ff-actorline a:hover {{ text-decoration:underline !important; }}
     .ff-details {{ margin-top: 8px; }}
-    .ff-details summary {{ cursor:pointer; font-weight:700; color:#1f2940; }}
+    .ff-details summary {{ cursor:pointer; font-weight:700; color:#17233b; }}
     .ff-stars{{position:relative;display:inline-block;font-size:18px;line-height:1;letter-spacing:1px}}
     .ff-stars .bot{{color:#d0d0d0;display:block}}
     .ff-stars .top{{color:#f5c518;position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;display:block}}
@@ -521,37 +565,60 @@ def apply_theme():
 
     div[data-testid='stTextInput'] > div > div,
     div[data-testid='stTextArea'] > div > div,
-    div[data-baseweb='select'] {{
+    div[data-baseweb='select'],
+    div[data-testid='stMultiSelect'] [data-baseweb='select'] {{
         background: rgba(255,255,255,0.96) !important;
         border: 1px solid rgba(214,220,229,0.96) !important;
         border-radius: 18px !important;
-        box-shadow: none !important;
+        box-shadow: 0 8px 18px rgba(20, 24, 35, 0.06) !important;
     }}
     div[data-testid='stTextInput'] input,
     div[data-testid='stTextArea'] textarea {{
-        color: #1f2940 !important;
+        color: #17233b !important;
         font-size: 1rem !important;
     }}
     div[data-testid='stTextArea'] textarea {{ min-height: 98px !important; }}
 
-    div[data-testid='stCheckbox'] label,
-    div[data-testid='stRadio'] label,
+    div[data-testid='stCheckbox'] {{
+        display: inline-block;
+        background: rgba(255,255,255,0.94);
+        border: 1px solid rgba(255,255,255,0.82);
+        border-radius: 18px;
+        box-shadow: 0 10px 22px rgba(19,24,38,0.08);
+        backdrop-filter: blur(10px);
+        padding: 6px 12px 6px 10px;
+        margin-top: 8px;
+    }}
+
+    div[data-testid='stRadio'] > label,
     div[data-testid='stSelectbox'] label,
     div[data-testid='stMultiSelect'] label,
     div[data-testid='stTextInput'] label,
     div[data-testid='stTextArea'] label {{
-        color: #1f2940 !important;
+        color: #17233b !important;
         font-weight: 600 !important;
+    }}
+
+    div[data-testid='stRadio'] [role='radiogroup'] {{
+        display: inline-flex !important;
+        flex-wrap: wrap !important;
+        gap: 16px !important;
+        background: rgba(255,255,255,0.94) !important;
+        border: 1px solid rgba(255,255,255,0.82) !important;
+        border-radius: 22px !important;
+        box-shadow: 0 10px 22px rgba(19,24,38,0.08) !important;
+        backdrop-filter: blur(10px) !important;
+        padding: 10px 14px !important;
     }}
 
     .stButton > button, button[kind='secondary'], button[kind='tertiary'] {{
         border-radius: 16px !important;
         border: 1px solid rgba(212,218,228,0.96) !important;
         background: rgba(255,255,255,0.96) !important;
-        color: #1f2940 !important;
+        color: #17233b !important;
         min-height: 46px !important;
         padding: 0 16px !important;
-        box-shadow: {THEME['bubble_shadow']} !important;
+        box-shadow: 0 10px 22px rgba(19,24,38,0.08) !important;
         font-weight: 700 !important;
     }}
     .stButton > button[kind='primary'] {{
@@ -560,46 +627,38 @@ def apply_theme():
         color: white !important;
     }}
 
-    .ff-field-label {{
-        color: #1f2940 !important;
-        font-weight: 600 !important;
-        margin: 2px 0 4px 2px;
-    }}
     .ff-clear-col button {{
-        min-width: 40px !important;
-        width: 40px !important;
-        height: 40px !important;
+        min-width: 36px !important;
+        width: 36px !important;
+        height: 36px !important;
         padding: 0 !important;
-        font-size: 20px !important;
-        border-radius: 14px !important;
+        font-size: 18px !important;
+        border-radius: 12px !important;
+        margin-top: 2px !important;
     }}
 
-    div[data-testid='stExpander'] details summary p {{ font-weight: 700 !important; color:#1f2940 !important; }}
+    div[data-testid='stExpander'] {{
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }}
+    div[data-testid='stExpander'] details {{
+        background: rgba(255,255,255,0.94) !important;
+        border: 1px solid rgba(255,255,255,0.82) !important;
+        border-radius: 22px !important;
+        box-shadow: 0 10px 22px rgba(19,24,38,0.08) !important;
+        backdrop-filter: blur(10px) !important;
+        overflow: hidden;
+    }}
+    div[data-testid='stExpander'] details summary {{
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+    }}
+    div[data-testid='stExpander'] details summary p {{ font-weight: 700 !important; color:#17233b !important; }}
     .stAlert {{ border-radius: 18px !important; }}
 
-    .ff-panel-top {{
-        background: {THEME['bubble_bg']};
-        border: 1px solid {THEME['bubble_border']};
-        border-radius: {THEME['bubble_radius']};
-        box-shadow: {THEME['bubble_shadow']};
-        backdrop-filter: blur(12px);
-        padding: 8px 12px 12px 12px;
-        margin-bottom: 14px;
-    }}
-    div[data-testid='stVerticalBlockBorderWrapper'] {{
-        background: {THEME['bubble_bg']} !important;
-        border: 1px solid {THEME['bubble_border']} !important;
-        border-radius: {THEME['bubble_radius']} !important;
-        box-shadow: {THEME['bubble_shadow']} !important;
-        backdrop-filter: blur(12px);
-        padding: 8px 10px 6px 10px !important;
-        margin: 0 0 14px 0 !important;
-    }}
-    div[data-testid='stVerticalBlockBorderWrapper'] > div {{
-        background: transparent !important;
-    }}
     .ff-preview-note {{
-        background: rgba(255, 245, 204, 0.82);
+        background: rgba(255, 245, 204, 0.86);
         color: #5a4606;
         border: 1px solid rgba(230, 198, 86, 0.65);
         border-radius: 16px;
@@ -616,17 +675,21 @@ def apply_theme():
         .ff-title {{ font-size: 2.2rem; }}
         .main .block-container {{ padding-left: 8px !important; padding-right: 8px !important; }}
         .ff-clear-col button {{
-            min-width: 34px !important;
-            width: 34px !important;
-            height: 34px !important;
-            font-size: 18px !important;
-            border-radius: 12px !important;
+            min-width: 32px !important;
+            width: 32px !important;
+            height: 32px !important;
+            font-size: 16px !important;
+            border-radius: 11px !important;
         }}
         div[data-testid='stTextInput'] input,
         div[data-testid='stTextArea'] textarea {{
             font-size: 0.96rem !important;
         }}
         div[data-testid='stTextArea'] textarea {{ min-height: 84px !important; }}
+        div[data-testid='stRadio'] [role='radiogroup'] {{
+            gap: 12px !important;
+            padding: 9px 12px !important;
+        }}
     }}
     </style>
     """
@@ -1008,7 +1071,7 @@ with st.sidebar:
 
 # ================== HOME ==================
 if st.session_state["page"] == "Accueil":
-    st.markdown("<h1 class='ff-title'>FilmFinder IA</h1>", unsafe_allow_html=True)
+    st.markdown("<div class='ff-title-pill'><h1 class='ff-title'>FilmFinder IA</h1></div>", unsafe_allow_html=True)
     st.markdown("<div class='ff-subtitle'>Souvenir flou → titres probables → où regarder.</div>", unsafe_allow_html=True)
 
     with st.form("signup_form"):
@@ -1047,7 +1110,7 @@ if st.session_state["page"] == "Accueil":
 
 # ================== PROFILE ==================
 if st.session_state["page"] == "Profil":
-    st.markdown("<h1 class='ff-title' style='font-size:2.4rem'>Profil</h1>", unsafe_allow_html=True)
+    st.markdown("<div class='ff-title-pill'><h1 class='ff-title' style='font-size:2.4rem'>Profil</h1></div>", unsafe_allow_html=True)
     with st.form("profile_form"):
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -1100,100 +1163,87 @@ q_more_default = st.session_state.get("last_typed_more", "")
 st.session_state.setdefault("q_main", q_main_default)
 st.session_state.setdefault("q_more", q_more_default)
 
-title_box = st.container(border=True)
-with title_box:
-    st.markdown("<h1 class='ff-title' style='font-size:2.8rem; margin-bottom:0;'>Recherche</h1>", unsafe_allow_html=True)
+st.markdown("<div class='ff-title-pill'><h1 class='ff-title' style='font-size:2.8rem;'>Recherche</h1></div>", unsafe_allow_html=True)
 
-mode_box = st.container(border=True)
-with mode_box:
-    mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1)
-    preset = MODE_PRESETS[mode]
+st.markdown("<div class='ff-pill'>Mode</div>", unsafe_allow_html=True)
+mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1, label_visibility="collapsed")
+preset = MODE_PRESETS[mode]
 
 if st.session_state.get("actor_search"):
-    actor_box = st.container(border=True)
-    with actor_box:
-        actor = st.session_state["actor_search"]
-        st.markdown(f"<div class='ff-inline-note' style='margin:0; box-shadow:none;'>Recherche acteur : <b>{escape(actor)}</b> — recherche automatique des films de cet acteur.</div>", unsafe_allow_html=True)
-        if st.button("Retour recherche normale"):
-            st.session_state["actor_search"] = ""
-            st.session_state["last_results"] = None
-            st.session_state["api_preview_notice"] = ""
-            st.session_state["api_error_notice"] = ""
-            try:
-                st.query_params.clear()
-            except Exception:
-                pass
-            st.rerun()
+    actor = st.session_state["actor_search"]
+    st.markdown(f"<div class='ff-inline-note'>Recherche acteur : <b>{escape(actor)}</b> — recherche automatique des films de cet acteur.</div>", unsafe_allow_html=True)
+    if st.button("Retour recherche normale"):
+        st.session_state["actor_search"] = ""
+        st.session_state["last_results"] = None
+        st.session_state["api_preview_notice"] = ""
+        st.session_state["api_error_notice"] = ""
+        try:
+            st.query_params.clear()
+        except Exception:
+            pass
+        st.rerun()
 
-souvenir_box = st.container(border=True)
-with souvenir_box:
-    st.markdown("<div class='ff-field-label'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
-    col1, col2 = st.columns([12, 1], gap="small")
-    with col1:
-        q_main = st.text_input(
-            "Ton souvenir (Entrée lance)",
-            key="q_main",
-            label_visibility="collapsed",
-            on_change=trigger_search,
-            placeholder="Ex: homme extraterrestre renaît",
-        )
-    with col2:
-        st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-        if st.button("✕", key="clear_q_main", help="Vider le souvenir"):
-            st.session_state["q_main"] = ""
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("<div class='ff-pill'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
+col1, col2 = st.columns([18, 2], gap="small")
+with col1:
+    q_main = st.text_input(
+        "Ton souvenir (Entrée lance)",
+        key="q_main",
+        label_visibility="collapsed",
+        on_change=trigger_search,
+        placeholder="Ex: homme extraterrestre renaît",
+    )
+with col2:
+    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
+    if st.button("✕", key="clear_q_main", help="Vider le souvenir"):
+        st.session_state["q_main"] = ""
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 if st.button("Trouver", type="primary"):
     st.session_state["do_search"] = True
 
-details_box = st.container(border=True)
-with details_box:
-    st.markdown("<div class='ff-field-label'>Détails (optionnel)</div>", unsafe_allow_html=True)
-    col3, col4 = st.columns([12, 1], gap="small")
-    with col3:
-        q_more = st.text_area(
-            "Détails (optionnel)",
-            key="q_more",
-            label_visibility="collapsed",
-            placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…",
-        )
-    with col4:
-        st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-        if st.button("✕", key="clear_q_more", help="Vider les détails"):
-            st.session_state["q_more"] = ""
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-
-filters_box = st.container(border=True)
-with filters_box:
-    with st.expander("Filtres", expanded=False):
-        left, right = st.columns(2)
-        selected_genres = []
-        selected_years = []
-        with left:
-            st.caption("Genres")
-            for g in GENRES:
-                if st.checkbox(g, key=f"genre_{g}"):
-                    selected_genres.append(g)
-        with right:
-            st.caption("Années")
-            for y in YEARS:
-                if st.checkbox(y, key=f"year_{y}"):
-                    selected_years.append(int(y))
-
-sort_box = st.container(border=True)
-with sort_box:
-    sort_mode = st.selectbox(
-        "Trier par",
-        ["Pertinence", "Année (récent)", "Note (haute)"],
-        index=["Pertinence", "Année (récent)", "Note (haute)"].index(st.session_state.get("sort_mode", "Pertinence")),
+st.markdown("<div class='ff-pill'>Détails (optionnel)</div>", unsafe_allow_html=True)
+col3, col4 = st.columns([18, 2], gap="small")
+with col3:
+    q_more = st.text_area(
+        "Détails (optionnel)",
+        key="q_more",
+        label_visibility="collapsed",
+        placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…",
     )
-    st.session_state["sort_mode"] = sort_mode
+with col4:
+    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
+    if st.button("✕", key="clear_q_more", help="Vider les détails"):
+        st.session_state["q_more"] = ""
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-apps_box = st.container(border=True)
-with apps_box:
-    only_my_apps = st.checkbox("Uniquement sur mes applis", value=False)
+with st.expander("Filtres", expanded=False):
+    left, right = st.columns(2)
+    selected_genres = []
+    selected_years = []
+    with left:
+        st.caption("Genres")
+        for g in GENRES:
+            if st.checkbox(g, key=f"genre_{g}"):
+                selected_genres.append(g)
+    with right:
+        st.caption("Années")
+        for y in YEARS:
+            if st.checkbox(y, key=f"year_{y}"):
+                selected_years.append(int(y))
+
+st.markdown("<div class='ff-pill'>Trier par</div>", unsafe_allow_html=True)
+sort_mode = st.selectbox(
+    "Trier par",
+    ["Pertinence", "Année (récent)", "Note (haute)"],
+    index=["Pertinence", "Année (récent)", "Note (haute)"].index(st.session_state.get("sort_mode", "Pertinence")),
+    label_visibility="collapsed",
+)
+st.session_state["sort_mode"] = sort_mode
+
+only_my_apps = st.checkbox("Uniquement sur mes applis", value=False)
 
 # ================== SEARCH ACTION ==================
 if st.session_state["do_search"]:
