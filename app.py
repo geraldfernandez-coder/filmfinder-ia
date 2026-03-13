@@ -353,14 +353,14 @@ def apply_theme():
         box-shadow: 0 8px 18px rgba(20, 24, 35, 0.06) !important;
     }}
     div[data-testid='stTextInput'],
-    div[data-testid='stTextArea'] {
+    div[data-testid='stTextArea'] {{
         max-width: none !important;
         width: 100% !important;
-    }
+    }}
     div[data-testid='stTextInput'] > div,
-    div[data-testid='stTextArea'] > div {
+    div[data-testid='stTextArea'] > div {{
         width: 100% !important;
-    }
+    }}
     div[data-testid='stTextInput'] input,
     div[data-testid='stTextArea'] textarea {{
         color: #17233b !important;
@@ -469,11 +469,11 @@ def apply_theme():
             gap: 8px !important;
         }}
         div[data-testid='stTextInput'],
-        div[data-testid='stTextArea'] {
+        div[data-testid='stTextArea'] {{
             max-width: none !important;
             width: 100% !important;
             min-width: 0 !important;
-        }
+        }}
         .ff-clear-col button {{
             min-width: 30px !important;
             width: 30px !important;
@@ -929,37 +929,41 @@ if actor_name:
         clear_actor_mode()
 
 st.markdown("<div class='ff-pill'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
-col1, col2, _sp1 = st.columns([5.35, 0.82, 5.83], gap="small")
-with col1:
-    st.text_input(
-        "Ton souvenir (Entrée lance)",
-        key="q_main",
-        label_visibility="collapsed",
-        on_change=run_search,
-        placeholder="Ex: homme extraterrestre renaît",
-    )
-with col2:
-    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    st.button("✕", key="clear_main", help="Vider le souvenir", on_click=clear_q_main)
-    st.markdown("</div>", unsafe_allow_html=True)
+row_main, _ = st.columns([8.5, 3.5], gap="small")
+with row_main:
+    col1, col2 = st.columns([8.9, 1.1], gap="small")
+    with col1:
+        st.text_input(
+            "Ton souvenir (Entrée lance)",
+            key="q_main",
+            label_visibility="collapsed",
+            on_change=run_search,
+            placeholder="Ex: homme extraterrestre renaît",
+        )
+    with col2:
+        st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
+        st.button("✕", key="clear_main", help="Vider le souvenir", on_click=clear_q_main)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
 if st.button("Trouver", type="primary"):
     run_search()
 
 st.markdown("<div class='ff-pill'>Détails (optionnel)</div>", unsafe_allow_html=True)
-col3, col4, _sp2 = st.columns([5.35, 0.82, 5.83], gap="small")
-with col3:
-    st.text_area(
-        "Détails (optionnel)",
-        key="q_more",
-        label_visibility="collapsed",
-        placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…",
-    )
-with col4:
-    st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
-    st.button("✕", key="clear_more", help="Vider les détails", on_click=clear_q_more)
-    st.markdown("</div>", unsafe_allow_html=True)
+row_more, _ = st.columns([8.5, 3.5], gap="small")
+with row_more:
+    col3, col4 = st.columns([8.9, 1.1], gap="small")
+    with col3:
+        st.text_area(
+            "Détails (optionnel)",
+            key="q_more",
+            label_visibility="collapsed",
+            placeholder="Acteur/actrice · année approx · pays · plateforme · scène marquante · ambiance · SF/space…",
+        )
+    with col4:
+        st.markdown("<div class='ff-clear-col'>", unsafe_allow_html=True)
+        st.button("✕", key="clear_more", help="Vider les détails", on_click=clear_q_more)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 with st.expander("Filtres", expanded=False):
     fg, fy = st.columns(2)
