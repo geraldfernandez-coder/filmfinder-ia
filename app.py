@@ -262,8 +262,8 @@ def apply_theme():
         .ff-result-title {{ font-size: 1.65rem; }}
         .ff-title-pill {{ padding: 12px 18px; }}
         .ff-pill {{ padding: 6px 12px; }}
-        .ff-inline-input { max-width: calc(100vw - 110px); }
-        .ff-inline-input.ff-textarea { max-width: calc(100vw - 110px); }
+        .ff-inline-input {{ max-width: calc(100vw - 110px); }}
+        .ff-inline-input.ff-textarea {{ max-width: calc(100vw - 110px); }}
         .ff-clear button {{ height:38px !important; width:38px !important; min-height:38px !important; border-radius:14px !important; }}
     }}
     </style>
