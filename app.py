@@ -367,13 +367,13 @@ def apply_theme():
         font-size: 1rem !important;
     }}
     div[data-testid='stTextInput'] input::placeholder,
-    div[data-testid='stTextArea'] textarea::placeholder {
+    div[data-testid='stTextArea'] textarea::placeholder {{
         color: #5a6885 !important;
         opacity: 1 !important;
-    }
-    label, p, span, div[data-testid='stMarkdownContainer'] p, .stMarkdown, .stText, .stCaption {
+    }}
+    label, p, span, div[data-testid='stMarkdownContainer'] p, .stMarkdown, .stText, .stCaption {{
         color: #17233b !important;
-    }
+    }}
     div[data-testid='stTextArea'] textarea {{ min-height: 94px !important; }}
 
     div[data-testid='stCheckbox'] {{
