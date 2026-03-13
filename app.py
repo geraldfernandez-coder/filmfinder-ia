@@ -493,13 +493,14 @@ def apply_theme():
         backdrop-filter: blur(12px);
     }}
     .ff-title-pill {{
-        padding: 14px 18px;
-        margin: 0 0 12px 0;
+        padding: 10px 18px;
+        margin: 0 0 10px 0;
+        border-radius: 20px;
     }}
     .ff-title {{
         margin: 0;
         color: #17233b;
-        font-size: 3rem;
+        font-size: 2.5rem;
         line-height: 1;
         font-weight: 800;
     }}
@@ -514,15 +515,17 @@ def apply_theme():
         backdrop-filter: blur(10px);
     }}
     .ff-pill {{
-        padding: 8px 14px;
-        margin: 10px 0 8px 0;
+        padding: 6px 12px;
+        margin: 6px 0 6px 0;
         color: #17233b;
         font-weight: 700;
+        border-radius: 999px;
     }}
     .ff-inline-note {{
-        padding: 11px 14px;
-        margin: 6px 0 12px 0;
+        padding: 9px 12px;
+        margin: 4px 0 10px 0;
         color: rgba(23,35,59,0.88);
+        border-radius: 18px;
     }}
 
     .ff-card {{
@@ -571,6 +574,10 @@ def apply_theme():
         border: 1px solid rgba(214,220,229,0.96) !important;
         border-radius: 18px !important;
         box-shadow: 0 8px 18px rgba(20, 24, 35, 0.06) !important;
+    }}
+    div[data-testid='stTextInput'],
+    div[data-testid='stTextArea'] {{
+        max-width: 430px;
     }}
     div[data-testid='stTextInput'] input,
     div[data-testid='stTextArea'] textarea {{
@@ -628,11 +635,11 @@ def apply_theme():
     }}
 
     .ff-clear-col button {{
-        min-width: 36px !important;
-        width: 36px !important;
-        height: 36px !important;
+        min-width: 34px !important;
+        width: 34px !important;
+        height: 34px !important;
         padding: 0 !important;
-        font-size: 18px !important;
+        font-size: 17px !important;
         border-radius: 12px !important;
         margin-top: 2px !important;
     }}
@@ -672,23 +679,36 @@ def apply_theme():
         .main .block-container {{ padding-left: 12px !important; padding-right: 12px !important; }}
     }}
     @media (max-width: 520px) {{
-        .ff-title {{ font-size: 2.2rem; }}
+        .ff-title {{ font-size: 2rem; }}
         .main .block-container {{ padding-left: 8px !important; padding-right: 8px !important; }}
+        .ff-title-pill {{ padding: 8px 14px; border-radius: 18px; }}
+        .ff-pill {{ padding: 5px 11px; margin: 4px 0 5px 0; }}
+        .ff-inline-note {{ padding: 8px 10px; }}
+        div[data-testid='stHorizontalBlock'] {{
+            flex-wrap: nowrap !important;
+            align-items: flex-start !important;
+            gap: 8px !important;
+        }}
+        div[data-testid='stTextInput'],
+        div[data-testid='stTextArea'] {{
+            max-width: 100% !important;
+            min-width: 0 !important;
+        }}
         .ff-clear-col button {{
-            min-width: 32px !important;
-            width: 32px !important;
-            height: 32px !important;
-            font-size: 16px !important;
-            border-radius: 11px !important;
+            min-width: 30px !important;
+            width: 30px !important;
+            height: 30px !important;
+            font-size: 15px !important;
+            border-radius: 10px !important;
         }}
         div[data-testid='stTextInput'] input,
         div[data-testid='stTextArea'] textarea {{
-            font-size: 0.96rem !important;
+            font-size: 0.95rem !important;
         }}
-        div[data-testid='stTextArea'] textarea {{ min-height: 84px !important; }}
+        div[data-testid='stTextArea'] textarea {{ min-height: 96px !important; }}
         div[data-testid='stRadio'] [role='radiogroup'] {{
-            gap: 12px !important;
-            padding: 9px 12px !important;
+            gap: 10px !important;
+            padding: 8px 10px !important;
         }}
     }}
     </style>
@@ -1163,7 +1183,7 @@ q_more_default = st.session_state.get("last_typed_more", "")
 st.session_state.setdefault("q_main", q_main_default)
 st.session_state.setdefault("q_more", q_more_default)
 
-st.markdown("<div class='ff-title-pill'><h1 class='ff-title' style='font-size:2.8rem;'>Recherche</h1></div>", unsafe_allow_html=True)
+st.markdown("<div class='ff-title-pill'><h1 class='ff-title' style='font-size:2.35rem;'>Recherche</h1></div>", unsafe_allow_html=True)
 
 st.markdown("<div class='ff-pill'>Mode</div>", unsafe_allow_html=True)
 mode = st.radio("Mode", ["Rapide", "Normal", "Profond"], horizontal=True, index=1, label_visibility="collapsed")
@@ -1184,7 +1204,7 @@ if st.session_state.get("actor_search"):
         st.rerun()
 
 st.markdown("<div class='ff-pill'>Ton souvenir (Entrée lance)</div>", unsafe_allow_html=True)
-col1, col2 = st.columns([18, 2], gap="small")
+col1, col2 = st.columns([11.2, 1], gap="small")
 with col1:
     q_main = st.text_input(
         "Ton souvenir (Entrée lance)",
@@ -1200,11 +1220,12 @@ with col2:
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
+st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
 if st.button("Trouver", type="primary"):
     st.session_state["do_search"] = True
 
 st.markdown("<div class='ff-pill'>Détails (optionnel)</div>", unsafe_allow_html=True)
-col3, col4 = st.columns([18, 2], gap="small")
+col3, col4 = st.columns([11.2, 1], gap="small")
 with col3:
     q_more = st.text_area(
         "Détails (optionnel)",
