@@ -325,17 +325,6 @@ def apply_theme():
     .ff-wide {{ width: 100%; }}
     .ff-note {{ font-size: 0.98rem; color: #223455; }}
     .ff-small {{ font-size: 0.92rem; opacity: 0.9; }}
-    .ff-profile-mini {{
-        padding: 10px 12px 8px 12px;
-        border-radius: 22px;
-        min-height: 100%;
-        margin-bottom: 8px;
-    }}
-    .ff-profile-services {{
-        padding: 10px 12px 10px 12px;
-        border-radius: 22px;
-        margin: 8px 0 10px 0;
-    }}
     .ff-actorline a {{ color:#0b57d0 !important; text-decoration:none !important; font-weight:600; }}
     .ff-actorline a:hover {{ text-decoration:underline !important; }}
     .ff-platforms {{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 10px 0; }}
@@ -900,31 +889,23 @@ if not st.session_state["entered"]:
     st.markdown("<div class='ff-subtitle'>Souvenir flou → titres probables → où regarder.</div>", unsafe_allow_html=True)
 
     with st.form("profile_form"):
-        c1, c2, c3, c4 = st.columns([1, 1, 1, 0.78], gap="small")
+        st.markdown("<div class='ff-bubble ff-wide'>", unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns([1, 1, 1, 0.7])
         with c1:
-            st.markdown("<div class='ff-bubble ff-profile-mini'>", unsafe_allow_html=True)
             country_options = ["FR", "US", "GB", "CA", "BE", "CH"]
             country = st.selectbox("Pays", country_options, index=safe_index(country_options, normalize_country(profile.get("country")), 0))
-            st.markdown("</div>", unsafe_allow_html=True)
         with c2:
-            st.markdown("<div class='ff-bubble ff-profile-mini'>", unsafe_allow_html=True)
             lang_options = ["fr-FR", "en-US", "en-GB"]
             lang = st.selectbox("Langue", lang_options, index=safe_index(lang_options, normalize_lang(profile.get("lang")), 0))
-            st.markdown("</div>", unsafe_allow_html=True)
         with c3:
-            st.markdown("<div class='ff-bubble ff-profile-mini'>", unsafe_allow_html=True)
             show_type_ui = st.selectbox("Type", ["Film", "Série"], index=0 if normalize_show_type(profile.get("show_type")) == "movie" else 1)
-            st.markdown("</div>", unsafe_allow_html=True)
         with c4:
-            st.markdown("<div class='ff-bubble ff-profile-mini'>", unsafe_allow_html=True)
             show_elsewhere = st.checkbox("Ailleurs", value=profile.get("show_elsewhere", False))
-            st.markdown("</div>", unsafe_allow_html=True)
 
         selected_names = [SERVICE_BY_ID[sid]["name"] for sid in profile.get("platform_ids", []) if sid in SERVICE_BY_ID]
-        st.markdown("<div class='ff-bubble ff-profile-services ff-wide'>", unsafe_allow_html=True)
         platforms = st.multiselect("Tes plateformes", SERVICE_NAMES, default=selected_names)
-        st.markdown("</div>", unsafe_allow_html=True)
         submit = st.form_submit_button("Entrer")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if submit:
         profile["country"] = country
